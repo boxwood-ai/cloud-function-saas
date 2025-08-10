@@ -2,72 +2,94 @@
 
 This directory contains sample `spec.md` files demonstrating different types of microservices that can be generated using the Cloud Function Microservice Generator.
 
+## Specification Complexity Levels
+
+### 📝 Simple Specs (`/simple/` directory)
+Minimal specifications with just the essential requirements. The AI generator will:
+- Automatically choose best practices and patterns
+- Add comprehensive error handling and validation
+- Select appropriate dependencies and configurations
+- Generate production-ready security features
+- Include standard monitoring and deployment settings
+
+**Use when:** You want to get started quickly with sensible defaults.
+
+### 🔧 Comprehensive Specs (main directory)
+Detailed specifications that give you full control over every aspect:
+- Explicit validation rules and error handling
+- Specific dependency and configuration choices
+- Custom business logic and security requirements
+- Detailed deployment and resource specifications
+- Precise integration and monitoring setup
+
+**Use when:** You need specific patterns, integrations, or have exact requirements.
+
 ## Available Examples
 
 ### 1. User Management API (Node.js)
-**File:** `user-api-nodejs.spec.md`
+**Simple:** `simple/user-api.spec.md` | **Comprehensive:** `user-api-nodejs.spec.md`
 
-A complete REST API for user authentication and profile management featuring:
+REST API for user authentication and profile management:
 - User registration and login endpoints
-- JWT token authentication
+- JWT token authentication  
 - Profile management CRUD operations
-- Firestore database integration
-- Input validation and security best practices
+- Database integration and validation
 
-**Use Case:** Backend API for web/mobile applications requiring user management
+**Use Case:** Backend API for web/mobile applications
 
 ---
 
 ### 2. Data Processing Pipeline (Python)
-**File:** `data-processor-python.spec.md`
+**Simple:** `simple/data-processor.spec.md` | **Comprehensive:** `data-processor-python.spec.md`
 
-A data processing microservice that handles CSV file uploads and BigQuery integration:
+Data processing microservice for file handling:
 - File upload and validation endpoints
 - Async processing with job status tracking
-- BigQuery data loading and transformation
-- Cloud Pub/Sub webhook handling
-- Error handling and data quality validation
+- Database integration and error handling
+- Email notifications
 
-**Use Case:** ETL pipelines, data ingestion, and batch processing workflows
+**Use Case:** ETL pipelines, data ingestion, batch processing
 
 ---
 
 ### 3. Authentication Service (Go)
-**File:** `auth-service-go.spec.md`
+**Simple:** `simple/auth-service.spec.md` | **Comprehensive:** `auth-service-go.spec.md`
 
-A high-performance authentication microservice built for enterprise use:
+High-performance authentication microservice:
 - JWT token generation and validation
 - API key management system
-- Token refresh and revocation
-- JWKS endpoint for public key distribution
-- PostgreSQL database with connection pooling
+- Public key distribution (JWKS)
+- Rate limiting and security
 
-**Use Case:** Centralized authentication for microservice architectures
+**Use Case:** Centralized authentication for microservices
 
 ---
 
-### 4. Webhook Handler (Node.js)
-**File:** `webhook-handler-nodejs.spec.md`
+### 4. Webhook Handler (Node.js)  
+**Simple:** `simple/webhook-handler.spec.md` | **Comprehensive:** `webhook-handler-nodejs.spec.md`
 
-A webhook processing service handling multiple third-party integrations:
-- Stripe payment webhook processing
-- GitHub repository event handling
-- SendGrid email event notifications
-- Event deduplication and retry logic
-- Comprehensive error handling and monitoring
+Webhook processing service for third-party integrations:
+- Multiple webhook provider support
+- Signature verification and security
+- Event processing and notifications
+- Retry logic and error handling
 
-**Use Case:** Integration hub for third-party service notifications
+**Use Case:** Integration hub for external services
 
 ## How to Use These Examples
 
-1. **Copy an example that matches your needs:**
+1. **Choose your complexity level:**
    ```bash
+   # For quick start with defaults
+   cp examples/simple/user-api.spec.md ./spec.md
+   
+   # For full control over implementation  
    cp examples/user-api-nodejs.spec.md ./spec.md
    ```
 
-2. **Customize the specification:**
+2. **Customize the specification (optional for simple specs):**
    - Modify endpoints to match your requirements
-   - Update data models and business logic
+   - Update data models and business logic  
    - Adjust deployment settings
 
 3. **Generate your microservice:**

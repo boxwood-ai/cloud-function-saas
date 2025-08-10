@@ -53,9 +53,34 @@ my-microservice/
 
 ## Spec.md Format
 
-The specification file follows this structure:
+The specification file supports two complexity levels:
 
-### Required Sections
+### 📝 Simple Specification Format
+Minimal requirements with AI-generated best practices:
+
+```markdown
+# Service Name: My API
+Description: Brief description of what the service does
+Runtime: Node.js 20
+
+## Endpoints
+### GET /users
+- Description: Get all users
+- Output: { users: array }
+
+## Models
+### User
+- name: string
+- email: string
+
+## Business Logic (optional)
+- Basic requirements and constraints
+```
+
+### 🔧 Comprehensive Specification Format
+Detailed control over all implementation aspects:
+
+#### Required Sections
 
 #### Service Overview
 
@@ -190,7 +215,13 @@ Runtime: Node.js 20
 2. **Create Specification**
 
    ```bash
-   # Create your microservice specification
+   # Option 1: Start with a simple spec (AI fills in the details)
+   cp examples/simple/user-api.spec.md ./spec.md
+   
+   # Option 2: Use comprehensive spec (full control)
+   cp examples/user-api-nodejs.spec.md ./spec.md
+   
+   # Option 3: Create from scratch
    touch spec.md
    # Edit with your requirements (see format above)
    ```
@@ -198,11 +229,14 @@ Runtime: Node.js 20
 3. **Generate Microservice**
 
    ```bash
-   # Generate the microservice code
-   npx cloud-function-generator generate
+   # Generate with automatic best practices (simple specs)
+   npx cloud-function-generator generate --mode=smart
    
-   # Or with custom output directory
-   npx cloud-function-generator generate --output ./my-service
+   # Generate exactly as specified (comprehensive specs)  
+   npx cloud-function-generator generate --mode=strict
+   
+   # Auto-detect spec complexity
+   npx cloud-function-generator generate
    ```
 
 4. **Deploy to Cloud Run**
@@ -269,9 +303,15 @@ npx cloud-function-generator generate [options]
 Options:
   --spec, -s      Path to spec.md file (default: ./spec.md)
   --output, -o    Output directory (default: ./generated)
+  --mode, -m      Generation mode: smart, strict, auto (default: auto)
   --runtime, -r   Runtime (nodejs20, python311, go121)
-  --region        Deployment region (default: us-central1)
+  --region        Deployment region (default: us-central1)  
   --dry-run       Show what would be generated without creating files
+
+Generation Modes:
+  smart           AI adds best practices to simple specs
+  strict          Generate exactly as specified (comprehensive specs)
+  auto            Auto-detect spec complexity and choose mode
 ```
 
 ### Deploy
