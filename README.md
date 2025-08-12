@@ -16,30 +16,47 @@ A Python prototype that transforms specification documents into deployed Google 
 
 ## Quick Start
 
-### 1. Setup
+### 1. Prerequisites
+```bash
+# Install Google Cloud SDK
+brew install google-cloud-sdk  # macOS
+# Or follow: https://cloud.google.com/sdk/docs/install
+
+# Authenticate with Google Cloud
+gcloud auth login
+gcloud config set project your-gcp-project-id
+```
+
+### 2. Setup
 ```bash
 # Clone and install dependencies
 pip install -r requirements.txt
 
 # Configure environment
 cp .env.example .env
-# Edit .env with your API keys and GCP project
+# Edit .env with your Anthropic API key and GCP project
 ```
 
-### 2. Create a Spec
+### 3. Validate Configuration
+```bash
+# Check if everything is set up correctly
+python prototype.py example-spec.md --validate-only
+```
+
+### 4. Create a Spec
 ```bash
 # Use the example or create your own
 cp example-spec.md my-service-spec.md
 # Edit my-service-spec.md with your requirements
 ```
 
-### 3. Generate & Deploy
+### 5. Generate & Deploy
 ```bash
-# Deploy to Cloud Run
-python prototype.py my-service-spec.md
+# Deploy to Cloud Run (with detailed output)
+python prototype.py my-service-spec.md --verbose
 
-# Or specify project explicitly
-python prototype.py my-service-spec.md --project my-gcp-project
+# Or use basic output
+python prototype.py my-service-spec.md
 ```
 
 That's it! Your microservice is now deployed and running on Cloud Run.
@@ -95,11 +112,53 @@ See [example-spec.md](example-spec.md) for a working example.
 3. **Deploy** directly to Google Cloud Run
 4. **Return** the deployed service URL
 
+## Command Options
+
+```bash
+python prototype.py <spec-file> [options]
+
+Options:
+  --project PROJECT     Override Google Cloud project ID
+  --region REGION       Override deployment region  
+  --output-dir DIR      Keep generated files in directory
+  --validate-only       Only validate configuration, don't deploy
+  --verbose, -v         Show detailed output and next steps
+```
+
+**Examples:**
+```bash
+# Basic usage
+python prototype.py my-spec.md
+
+# With detailed output
+python prototype.py my-spec.md --verbose
+
+# Just validate setup
+python prototype.py my-spec.md --validate-only
+
+# Override project
+python prototype.py my-spec.md --project my-other-project
+
+# Keep generated files
+python prototype.py my-spec.md --output-dir ./generated
+```
+
+## Error Handling
+
+The prototype includes comprehensive validation:
+
+- ✅ **API Key Check**: Validates Anthropic API key and permissions
+- ✅ **Google Cloud Setup**: Checks gcloud installation and authentication  
+- ✅ **Project Access**: Verifies Cloud Run is enabled in your project
+- ✅ **Spec Validation**: Ensures your spec file is valid and readable
+
+Run with `--validate-only` to check your setup without deploying.
+
 ## Requirements
 
 - Python 3.8+
-- Google Cloud SDK (`gcloud` CLI)
-- Anthropic API key
+- Google Cloud SDK (`gcloud` CLI) - [Install Guide](https://cloud.google.com/sdk/docs/install)
+- Anthropic API key - [Get one here](https://console.anthropic.com/)
 - Google Cloud project with Cloud Run enabled
 
 ## Generated Output

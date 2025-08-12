@@ -368,72 +368,219 @@ class CloudRunDeployer:
             return False
 
 
+def validate_configuration():
+    """Validate required configuration and environment setup"""
+    errors = []
+    warnings = []
+    
+    # Check for required environment variables
+    api_key = os.getenv('ANTHROPIC_API_KEY')
+    if not api_key:
+        errors.append("ANTHROPIC_API_KEY is required. Set it in .env or environment variables.")
+    
+    project_id = os.getenv('GOOGLE_CLOUD_PROJECT')
+    if not project_id:
+        warnings.append("GOOGLE_CLOUD_PROJECT not set in .env. You'll need to specify --project flag.")
+    
+    # Check if .env file exists
+    if not os.path.exists('.env'):
+        warnings.append(".env file not found. Using environment variables and defaults.")
+    
+    # Check if gcloud CLI is available
+    try:
+        subprocess.run(['gcloud', '--version'], capture_output=True, check=True)
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        errors.append("Google Cloud SDK (gcloud) is not installed or not in PATH. Please install it first.")
+    
+    # Check if gcloud is authenticated
+    try:
+        result = subprocess.run(['gcloud', 'auth', 'list', '--filter=status:ACTIVE'], 
+                              capture_output=True, text=True, check=True)
+        if 'ACTIVE' not in result.stdout:
+            errors.append("No active Google Cloud authentication found. Run 'gcloud auth login' first.")
+    except subprocess.CalledProcessError:
+        errors.append("Unable to check Google Cloud authentication status.")
+    
+    # Test Anthropic API connection if key is available
+    if api_key:
+        try:
+            client = anthropic.Anthropic(api_key=api_key)
+            # Test with minimal request
+            client.messages.create(
+                model="claude-sonnet-4-20250514",
+                max_tokens=1,
+                messages=[{"role": "user", "content": "test"}]
+            )
+        except anthropic.AuthenticationError:
+            errors.append("Invalid ANTHROPIC_API_KEY. Please check your API key.")
+        except anthropic.PermissionDeniedError:
+            errors.append("Anthropic API key doesn't have permission to use Claude models.")
+        except Exception as e:
+            warnings.append(f"Unable to verify Anthropic API connection: {str(e)}")
+    
+    return errors, warnings
+
+
 def main():
     """Main prototype function"""
-    parser = argparse.ArgumentParser(description='Cloud Function Microservice Generator Prototype')
+    parser = argparse.ArgumentParser(
+        description='Cloud Function Microservice Generator Prototype',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  python prototype.py spec.md                    # Use .env configuration
+  python prototype.py spec.md --project my-gcp   # Override GCP project
+  python prototype.py spec.md --validate-only    # Only validate configuration
+        """
+    )
     parser.add_argument('spec_file', help='Path to spec.md file')
-    parser.add_argument('--project', help='Google Cloud project ID (default: from .env)')
-    parser.add_argument('--region', help='Deployment region (default: from .env or us-central1)')
+    parser.add_argument('--project', help='Google Cloud project ID (overrides .env)')
+    parser.add_argument('--region', help='Deployment region (overrides .env)')
     parser.add_argument('--output-dir', help='Output directory (default: temp dir)')
+    parser.add_argument('--validate-only', action='store_true', help='Only validate configuration, don\'t deploy')
+    parser.add_argument('--verbose', '-v', action='store_true', help='Verbose output')
     
     args = parser.parse_args()
     
+    # Validate configuration first
+    print("🔍 Validating configuration...")
+    errors, warnings = validate_configuration()
+    
+    # Show warnings
+    if warnings:
+        print("\n⚠️  Warnings:")
+        for warning in warnings:
+            print(f"   • {warning}")
+    
+    # Show errors and exit if any
+    if errors:
+        print("\n❌ Configuration Errors:")
+        for error in errors:
+            print(f"   • {error}")
+        print("\n💡 Please fix the above errors and try again.")
+        sys.exit(1)
+    
+    print("✅ Configuration validated successfully!")
+    
+    # Exit if only validating
+    if args.validate_only:
+        print("\n🎉 All checks passed! Ready to generate and deploy microservices.")
+        return
+    
     # Check if spec file exists
     if not os.path.exists(args.spec_file):
-        print(f"Error: Spec file {args.spec_file} not found")
+        print(f"\n❌ Error: Spec file '{args.spec_file}' not found")
+        print("💡 Make sure the file path is correct or create the spec file first.")
+        sys.exit(1)
+    
+    # Validate spec file is readable
+    try:
+        with open(args.spec_file, 'r') as f:
+            spec_content = f.read()
+        if not spec_content.strip():
+            print(f"\n❌ Error: Spec file '{args.spec_file}' is empty")
+            sys.exit(1)
+    except Exception as e:
+        print(f"\n❌ Error reading spec file: {e}")
         sys.exit(1)
     
     # Read and parse spec
-    print(f"Reading spec from {args.spec_file}...")
-    with open(args.spec_file, 'r') as f:
-        spec_content = f.read()
+    print(f"\n📖 Reading spec from {args.spec_file}...")
     
     spec_parser = SpecParser()
-    spec = spec_parser.parse(spec_content)
-    print(f"Parsed spec for service: {spec.name}")
+    try:
+        spec = spec_parser.parse(spec_content)
+        if not spec.name:
+            print("⚠️  Warning: No service name found in spec")
+        if not spec.endpoints:
+            print("⚠️  Warning: No endpoints defined in spec")
+        print(f"✅ Parsed spec for service: {spec.name or 'Unnamed Service'}")
+        if args.verbose:
+            print(f"   • Description: {spec.description}")
+            print(f"   • Runtime: {spec.runtime}")
+            print(f"   • Endpoints: {len(spec.endpoints)}")
+            print(f"   • Models: {len(spec.models)}")
+    except Exception as e:
+        print(f"\n❌ Error parsing spec file: {e}")
+        sys.exit(1)
     
     # Generate code
-    print("Generating Cloud Run function code...")
+    print("\n🤖 Generating Cloud Run function code with Claude...")
     code_generator = CodeGenerator()
-    generated_files = code_generator.generate_cloud_function(spec)
     
-    if not generated_files:
-        print("Error: Failed to generate code")
+    try:
+        generated_files = code_generator.generate_cloud_function(spec)
+        if not generated_files:
+            print("❌ Error: Failed to generate code")
+            sys.exit(1)
+        print(f"✅ Generated {len(generated_files)} files successfully")
+    except Exception as e:
+        print(f"❌ Error generating code: {e}")
         sys.exit(1)
     
     # Create output directory
     output_dir = args.output_dir or tempfile.mkdtemp(prefix='cloud-function-')
-    os.makedirs(output_dir, exist_ok=True)
+    try:
+        os.makedirs(output_dir, exist_ok=True)
+    except Exception as e:
+        print(f"❌ Error creating output directory: {e}")
+        sys.exit(1)
     
     # Write generated files
-    print(f"Writing generated files to {output_dir}...")
-    for filename, content in generated_files.items():
-        file_path = os.path.join(output_dir, filename)
-        with open(file_path, 'w') as f:
-            f.write(content)
-        print(f"  Created: {filename}")
+    print(f"\n📝 Writing generated files to {output_dir}...")
+    try:
+        for filename, content in generated_files.items():
+            file_path = os.path.join(output_dir, filename)
+            with open(file_path, 'w') as f:
+                f.write(content)
+            print(f"   ✅ Created: {filename}")
+            if args.verbose:
+                print(f"      Size: {len(content)} characters")
+    except Exception as e:
+        print(f"❌ Error writing files: {e}")
+        sys.exit(1)
     
     # Deploy to Cloud Run
-    print("Deploying to Google Cloud Run...")
+    print(f"\n🚀 Deploying to Google Cloud Run...")
     service_name = spec.name.lower().replace(' ', '-').replace('_', '-')
     deployer = CloudRunDeployer(args.project, args.region)
     
     if not deployer.project_id:
-        print("Error: No Google Cloud project specified. Use --project or set GOOGLE_CLOUD_PROJECT in .env")
+        print("❌ Error: No Google Cloud project specified. Use --project or set GOOGLE_CLOUD_PROJECT in .env")
         sys.exit(1)
     
-    success = deployer.deploy(service_name, output_dir)
+    print(f"   • Service name: {service_name}")
+    print(f"   • Project: {deployer.project_id}")
+    print(f"   • Region: {deployer.region}")
     
-    if success:
-        print(f"\n✅ Successfully deployed {spec.name} to Cloud Run!")
-        print(f"Service URL: https://{service_name}-{deployer.project_id}.{deployer.region}.run.app")
-    else:
-        print("\n❌ Deployment failed")
-        print(f"Generated files are available at: {output_dir}")
+    try:
+        success = deployer.deploy(service_name, output_dir)
+        
+        if success:
+            print(f"\n🎉 Successfully deployed {spec.name} to Cloud Run!")
+            service_url = f"https://{service_name}-{deployer.project_id}.{deployer.region}.run.app"
+            print(f"🌐 Service URL: {service_url}")
+            if args.verbose:
+                print(f"\n💡 Next steps:")
+                print(f"   • Test your API: curl {service_url}")
+                print(f"   • View logs: gcloud logs read --service={service_name}")
+                print(f"   • Monitor: https://console.cloud.google.com/run/detail/{deployer.region}/{service_name}/overview")
+        else:
+            print("\n❌ Deployment failed")
+            print(f"💡 Generated files are available at: {output_dir}")
+            print("💡 You can deploy manually with: gcloud run deploy --source .")
+    except Exception as e:
+        print(f"❌ Deployment error: {e}")
+        sys.exit(1)
     
     # Clean up temp directory if we created it
     if not args.output_dir:
-        shutil.rmtree(output_dir)
+        try:
+            shutil.rmtree(output_dir)
+            if args.verbose:
+                print(f"🗑️  Cleaned up temporary directory: {output_dir}")
+        except Exception as e:
+            print(f"⚠️  Warning: Could not clean up temp directory: {e}")
 
 
 if __name__ == '__main__':
