@@ -135,7 +135,8 @@ class CodeGenerator:
             
             # Known Sonnet models in order of release (most recent first)
             known_models = [
-                "claude-3-5-sonnet-20241022",
+                "claude-sonnet-4-20250514",    # Sonnet 4 (latest)
+                "claude-3-5-sonnet-20241022",  # Sonnet 3.5
                 "claude-3-5-sonnet-20240620", 
                 "claude-3-sonnet-20240229"
             ]
@@ -155,13 +156,13 @@ class CodeGenerator:
                     continue
             
             # Fallback to a known working model
-            fallback_model = "claude-3-5-sonnet-20241022"
+            fallback_model = "claude-sonnet-4-20250514"
             print(f"Using fallback Sonnet model: {fallback_model}")
             return fallback_model
             
         except Exception as e:
             print(f"Error detecting latest model, using fallback: {e}")
-            return "claude-3-5-sonnet-20241022"
+            return "claude-sonnet-4-20250514"
     
     def generate_cloud_function(self, spec: ServiceSpec) -> Dict[str, str]:
         """Generate complete Cloud Run function code"""
