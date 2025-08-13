@@ -1,19 +1,19 @@
 # CI/CD Pipeline - DISABLED
-# Uncomment the sections below when ready to enable automated testing
-
-# name: CI
-
-# on:
-#   push:
-#     branches: [ main, develop ]
-#   pull_request:
-#     branches: [ main, develop ]
-
-# DISABLED - To enable CI/CD:
+# 
+# This file contains the complete CI/CD configuration.
+# When you're ready to enable automated testing:
 # 1. Set up GitHub repository
-# 2. Configure secrets (ANTHROPIC_API_KEY_TEST, etc.)
-# 3. Uncomment this file
+# 2. Configure repository secrets (ANTHROPIC_API_KEY_TEST, etc.)
+# 3. Rename this file from ci.yml.disabled to ci.yml
 # 4. Push to trigger first workflow run
+
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
 
 jobs:
   test:
