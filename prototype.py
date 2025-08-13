@@ -24,6 +24,34 @@ import traceback
 load_dotenv()
 
 
+def sanitize_secrets(text: str) -> str:
+    """Remove common secrets and sensitive information from text"""
+    import re
+    
+    # Common secret patterns to redact
+    patterns = [
+        # API keys and tokens
+        (r'["\s=](sk-[a-zA-Z0-9]{48})', r'\1[REDACTED-API-KEY]'),
+        (r'["\s=](xoxb-[a-zA-Z0-9-]{50,})', r'\1[REDACTED-SLACK-TOKEN]'),
+        (r'["\s=]([A-Za-z0-9]{32,})', r'\1[REDACTED-TOKEN]'),
+        # Environment variables that might contain secrets
+        (r'(API_KEY[^=]*=)[^\s\n]+', r'\1[REDACTED]'),
+        (r'(SECRET[^=]*=)[^\s\n]+', r'\1[REDACTED]'),
+        (r'(PASSWORD[^=]*=)[^\s\n]+', r'\1[REDACTED]'),
+        (r'(TOKEN[^=]*=)[^\s\n]+', r'\1[REDACTED]'),
+        # JWT tokens
+        (r'(eyJ[A-Za-z0-9-_=]+\.[A-Za-z0-9-_=]+\.?[A-Za-z0-9-_.+/=]*)', r'[REDACTED-JWT]'),
+        # URLs with credentials
+        (r'(https?://[^:]+:)[^@]+(@)', r'\1[REDACTED]\2'),
+    ]
+    
+    sanitized = text
+    for pattern, replacement in patterns:
+        sanitized = re.sub(pattern, replacement, sanitized, flags=re.IGNORECASE)
+    
+    return sanitized
+
+
 def setup_logging(output_dir: str, debug: bool = False) -> logging.Logger:
     """Setup logging to both console and file"""
     # Create logger
@@ -44,11 +72,18 @@ def setup_logging(output_dir: str, debug: bool = False) -> logging.Logger:
     )
     simple_formatter = logging.Formatter('%(levelname)s - %(message)s')
     
-    # File handler - detailed logging
+    # File handler - detailed logging with restricted permissions
     file_handler = logging.FileHandler(log_file, mode='w', encoding='utf-8')
     file_handler.setLevel(logging.DEBUG)
     file_handler.setFormatter(detailed_formatter)
     logger.addHandler(file_handler)
+    
+    # Set restrictive permissions on log file (600 - owner only)
+    try:
+        import stat
+        os.chmod(log_file, stat.S_IRUSR | stat.S_IWUSR)  # 600 permissions
+    except Exception:
+        pass  # Continue if chmod fails
     
     # Console handler - only if debug mode
     if debug:
@@ -288,6 +323,13 @@ Requirements:
 4. Include package.json with all dependencies
 5. Follow Google Cloud Run best practices
 6. Include basic logging with console.log
+7. MUST include a Dockerfile with these requirements:
+   - FROM node:20-slim (or compatible)
+   - EXPOSE 8080 (REQUIRED for Cloud Run)
+   - Install curl for health checks
+   - Use non-root user for security
+   - Set PORT environment variable handling
+   - CMD ["npm", "start"]
 
 Please provide the files in this format:
 ```javascript
@@ -297,6 +339,11 @@ Please provide the files in this format:
 
 ```json
 // FILE: package.json
+[code here]
+```
+
+```dockerfile
+// FILE: Dockerfile
 [code here]
 ```
 """
@@ -333,7 +380,8 @@ Please provide the files in this format:
         """Fallback code generation without AI"""
         return {
             'index.js': self._generate_basic_index(spec),
-            'package.json': self._generate_basic_package_json(spec)
+            'package.json': self._generate_basic_package_json(spec),
+            'Dockerfile': self._generate_basic_dockerfile(spec)
         }
     
     def _fallback_generation_simple(self, content: str) -> Dict[str, str]:
@@ -350,6 +398,15 @@ Please provide the files in this format:
             files['index.js'] = js_matches[0].strip()
         if json_matches:
             files['package.json'] = json_matches[0].strip()
+        
+        # Always ensure we have a Dockerfile
+        if 'Dockerfile' not in files:
+            from dataclasses import dataclass
+            @dataclass
+            class DummySpec:
+                name: str = "generated-service"
+                description: str = "Generated Cloud Run service"
+            files['Dockerfile'] = self._generate_basic_dockerfile(DummySpec())
         
         return files
     
@@ -406,6 +463,39 @@ module.exports = app;
                 "node": ">=18"
             }
         }, indent=2)
+    
+    def _generate_basic_dockerfile(self, spec: ServiceSpec) -> str:
+        """Generate basic Dockerfile with all Cloud Run requirements"""
+        return f"""FROM node:20-slim
+
+# Set working directory
+WORKDIR /usr/src/app
+
+# Copy package files
+COPY package*.json ./
+
+# Install dependencies and curl for health checks
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/* \\
+    && npm ci --only=production && npm cache clean --force
+
+# Copy application code
+COPY . .
+
+# Create non-root user
+RUN groupadd -r appuser && useradd -r -g appuser appuser
+RUN chown -R appuser:appuser /usr/src/app
+USER appuser
+
+# REQUIRED: Expose port 8080 for Cloud Run
+EXPOSE 8080
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \\
+  CMD curl -f http://localhost:8080/ || exit 1
+
+# Start the application
+CMD ["npm", "start"]
+"""
 
 
 class CloudRunDeployer:
@@ -489,6 +579,12 @@ class CloudRunDeployer:
             return_code = process.poll()
             full_output = '\n'.join(output_lines)
             
+            # Ensure we have a valid return code
+            if return_code is None:
+                return_code = process.wait()  # Wait for the process to finish
+            
+            self.logger.debug(f"Process completed with return code: {return_code}")
+            
             if return_code == 0:
                 print("\n🎉 Deployment successful!")
                 print(full_output)
@@ -506,16 +602,25 @@ class CloudRunDeployer:
             self.logger.error(f"Failed command: {' '.join(e.cmd)}")
             
             if e.output:
-                print(f"Command output: {e.output}")
-                self.logger.error(f"Command output:\n{e.output}")
+                sanitized_output = sanitize_secrets(str(e.output))
+                print(f"Command output: {sanitized_output}")
+                self.logger.error(f"Command output:\n{sanitized_output}")
             if hasattr(e, 'stdout') and e.stdout:
-                print(f"Standard output: {e.stdout}")
-                self.logger.error(f"Standard output:\n{e.stdout}")
+                sanitized_stdout = sanitize_secrets(str(e.stdout))
+                print(f"Standard output: {sanitized_stdout}")
+                self.logger.error(f"Standard output:\n{sanitized_stdout}")
             if hasattr(e, 'stderr') and e.stderr:
-                print(f"Error output: {e.stderr}")
-                self.logger.error(f"Error output:\n{e.stderr}")
+                sanitized_stderr = sanitize_secrets(str(e.stderr))
+                print(f"Error output: {sanitized_stderr}")
+                self.logger.error(f"Error output:\n{sanitized_stderr}")
             
             self.logger.error(f"Full exception details: {traceback.format_exc()}")
+            
+            # Show debugging help
+            print(f"\n🔍 For detailed build logs and debugging:")
+            print(f"   • Visit: https://console.cloud.google.com/cloud-build/builds?project={self.project_id}")
+            print(f"   • Look for the most recent failed build")
+            print(f"   • Check build steps for specific error details")
             
             # Try to fetch build logs for more details
             self._fetch_build_logs(service_name)
@@ -540,13 +645,13 @@ class CloudRunDeployer:
         try:
             print("\n📜 Fetching recent build logs for debugging...")
             
-            # Get recent Cloud Build logs
+            # Get recent Cloud Build logs (get the 3 most recent builds)
             cmd = [
                 'gcloud', 'builds', 'list',
-                '--filter', f'substitutions.SERVICE_NAME:{service_name}',
-                '--limit', '1',
+                '--limit', '3',
                 '--format', 'value(id)',
-                '--project', self.project_id
+                '--project', self.project_id,
+                '--sort-by', '~createTime'
             ]
             self.logger.debug(f"Running build list command: {' '.join(cmd)}")
             
@@ -554,42 +659,48 @@ class CloudRunDeployer:
             self.logger.debug(f"Build list result - returncode: {result.returncode}, stdout: {result.stdout}, stderr: {result.stderr}")
             
             if result.returncode == 0 and result.stdout.strip():
-                build_id = result.stdout.strip()
-                print(f"   Found recent build: {build_id}")
-                self.logger.info(f"Found recent build: {build_id}")
+                build_ids = result.stdout.strip().split('\n')
+                print(f"   Found recent builds: {len(build_ids)}")
+                self.logger.info(f"Found {len(build_ids)} recent builds: {build_ids}")
                 
-                # Get the build logs
-                log_cmd = [
-                    'gcloud', 'builds', 'log', build_id,
-                    '--project', self.project_id
-                ]
-                self.logger.debug(f"Running build log command: {' '.join(log_cmd)}")
-                
-                log_result = subprocess.run(log_cmd, capture_output=True, text=True, timeout=60)
-                self.logger.debug(f"Build log result - returncode: {log_result.returncode}")
-                
-                if log_result.returncode == 0 and log_result.stdout:
-                    print("\n🔍 Build Log Details:")
-                    print("=" * 60)
-                    # Show last 50 lines of build log
-                    lines = log_result.stdout.strip().split('\n')
-                    for line in lines[-50:]:
-                        print(f"   {line}")
-                    print("=" * 60)
-                    
-                    # Log the full build log
-                    self.logger.error("FULL BUILD LOG:")
-                    self.logger.error("=" * 40)
-                    self.logger.error(log_result.stdout)
-                    self.logger.error("=" * 40)
-                else:
-                    print("   Could not retrieve detailed build logs")
-                    self.logger.warning("Could not retrieve detailed build logs")
+                # Get logs for the most recent build
+                for build_id in build_ids:
+                    if build_id.strip():
+                        print(f"   Fetching logs for build: {build_id}")
+                        self.logger.info(f"Fetching logs for build: {build_id}")
+                        
+                        # Get the build logs
+                        log_cmd = [
+                            'gcloud', 'builds', 'log', build_id.strip(),
+                            '--project', self.project_id
+                        ]
+                        self.logger.debug(f"Running build log command: {' '.join(log_cmd)}")
+                        
+                        log_result = subprocess.run(log_cmd, capture_output=True, text=True, timeout=60)
+                        self.logger.debug(f"Build log result - returncode: {log_result.returncode}")
+                        
+                        if log_result.returncode == 0 and log_result.stdout:
+                            sanitized_log = sanitize_secrets(log_result.stdout)
+                            print(f"\n🔍 Build Log Details for {build_id}:")
+                            print("=" * 60)
+                            # Show last 50 lines of build log (sanitized)
+                            lines = sanitized_log.strip().split('\n')
+                            for line in lines[-50:]:
+                                print(f"   {line}")
+                            print("=" * 60)
+                            
+                            # Log the full build log (sanitized)
+                            self.logger.error(f"FULL BUILD LOG FOR {build_id}:")
+                            self.logger.error("=" * 40)
+                            self.logger.error(sanitized_log)
+                            self.logger.error("=" * 40)
+                            break  # Only show the first successful log
+                        else:
+                            print(f"   Could not retrieve logs for build {build_id}")
+                            self.logger.warning(f"Could not retrieve logs for build {build_id}")
             else:
-                print("   No recent build found for this service")
-                self.logger.warning("No recent build found for this service")
-                # Try generic recent builds
-                self._fetch_recent_build_logs()
+                print("   No recent builds found")
+                self.logger.warning("No recent builds found")
                 
         except subprocess.TimeoutExpired:
             timeout_msg = "Timeout while fetching build logs"
@@ -872,7 +983,7 @@ Examples:
     # Validate generated files before deployment
     print("\n🔍 Validating generated files before deployment...")
     logger.info("Validating generated files before deployment...")
-    required_files = ['package.json', 'index.js']
+    required_files = ['package.json', 'index.js', 'Dockerfile']
     missing_files = []
     validation_errors = []
     
@@ -923,6 +1034,28 @@ Examples:
                     
                     if not validation_errors or not any(file in error for error in validation_errors):
                         print(f"      ✅ Contains Express.js server code")
+                
+                elif file == 'Dockerfile':
+                    # Check for critical Docker/Cloud Run requirements
+                    dockerfile_checks = [
+                        ('EXPOSE 8080', 'Missing EXPOSE 8080 directive (required for Cloud Run)'),
+                        ('FROM node:', 'Missing Node.js base image'),
+                        ('CMD ', 'Missing CMD directive'),
+                        ('WORKDIR ', 'Missing WORKDIR directive'),
+                    ]
+                    
+                    dockerfile_errors = []
+                    for check, error_msg in dockerfile_checks:
+                        if check not in content:
+                            dockerfile_errors.append(f"{file}: {error_msg}")
+                            validation_errors.append(f"{file}: {error_msg}")
+                    
+                    if not dockerfile_errors:
+                        print(f"      ✅ Contains required Cloud Run directives")
+                    else:
+                        print(f"      ❌ Missing critical directives: {len(dockerfile_errors)}")
+                        for error in dockerfile_errors:
+                            print(f"        • {error.split(': ', 1)[1]}")
                 
             except Exception as e:
                 validation_errors.append(f"{file}: Could not validate content - {e}")
