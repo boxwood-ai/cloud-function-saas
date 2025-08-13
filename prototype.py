@@ -374,6 +374,12 @@ Please provide the files in this format:
                 print("🔍 Debug - No structured files found, using fallback parsing")
             files = self._fallback_generation_simple(generated_content)
         
+        # Always ensure we have a Dockerfile - add it if missing
+        if 'Dockerfile' not in files:
+            if self.debug:
+                print("🔍 Debug - Adding missing Dockerfile")
+            files['Dockerfile'] = self._generate_basic_dockerfile_simple()
+        
         return files
     
     def _fallback_generation(self, spec: ServiceSpec) -> Dict[str, str]:
@@ -401,12 +407,7 @@ Please provide the files in this format:
         
         # Always ensure we have a Dockerfile
         if 'Dockerfile' not in files:
-            from dataclasses import dataclass
-            @dataclass
-            class DummySpec:
-                name: str = "generated-service"
-                description: str = "Generated Cloud Run service"
-            files['Dockerfile'] = self._generate_basic_dockerfile(DummySpec())
+            files['Dockerfile'] = self._generate_basic_dockerfile_simple()
         
         return files
     
@@ -476,7 +477,40 @@ COPY package*.json ./
 
 # Install dependencies and curl for health checks
 RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/* \\
-    && npm ci --only=production && npm cache clean --force
+    && npm install --only=production && npm cache clean --force
+
+# Copy application code
+COPY . .
+
+# Create non-root user
+RUN groupadd -r appuser && useradd -r -g appuser appuser
+RUN chown -R appuser:appuser /usr/src/app
+USER appuser
+
+# REQUIRED: Expose port 8080 for Cloud Run
+EXPOSE 8080
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \\
+  CMD curl -f http://localhost:8080/ || exit 1
+
+# Start the application
+CMD ["npm", "start"]
+"""
+
+    def _generate_basic_dockerfile_simple(self) -> str:
+        """Generate basic Dockerfile without spec dependency"""
+        return """FROM node:20-slim
+
+# Set working directory
+WORKDIR /usr/src/app
+
+# Copy package files
+COPY package*.json ./
+
+# Install dependencies and curl for health checks
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/* \\
+    && npm install --only=production && npm cache clean --force
 
 # Copy application code
 COPY . .
