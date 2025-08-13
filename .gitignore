@@ -51,8 +51,9 @@ env/
 ehthumbs.db
 Thumbs.db
 
-# Generated files
-generated/
+# Generated files - exclude contents but keep folders
+generated/*
+!generated/.gitkeep
 output/
 temp/
 tmp/
