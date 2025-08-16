@@ -19,9 +19,180 @@ from dotenv import load_dotenv
 from datetime import datetime
 import logging
 import traceback
+import time
+import threading
+from contextlib import contextmanager
+
+# Terminal UI imports
+try:
+    from rich.console import Console
+    from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn
+    from rich.panel import Panel
+    from rich.table import Table
+    from rich.text import Text
+    from rich.columns import Columns
+    from rich.tree import Tree
+    from rich.live import Live
+    from rich.status import Status
+    RICH_AVAILABLE = True
+except ImportError:
+    RICH_AVAILABLE = False
+    Console = None
 
 # Load environment variables
 load_dotenv()
+
+# Global console for fancy output
+console = Console() if RICH_AVAILABLE else None
+
+class TaskStatus:
+    """Simple task status tracker for terminal UI"""
+    PENDING = "⏳"
+    IN_PROGRESS = "🔄"
+    COMPLETED = "✅"
+    FAILED = "❌"
+    WARNING = "⚠️"
+
+class FancyUI:
+    """Fancy terminal UI manager"""
+    def __init__(self, use_rich=True):
+        self.use_rich = use_rich and RICH_AVAILABLE
+        self.console = console if self.use_rich else None
+        self.tasks = []
+        self.current_task_id = None
+        
+    def add_task(self, task_id: str, description: str, status: str = TaskStatus.PENDING):
+        """Add a task to the list"""
+        self.tasks.append({
+            'id': task_id,
+            'description': description,
+            'status': status,
+            'details': []
+        })
+    
+    def update_task(self, task_id: str, status: str = None, details: str = None):
+        """Update task status or add details"""
+        for task in self.tasks:
+            if task['id'] == task_id:
+                if status:
+                    task['status'] = status
+                if details:
+                    task['details'].append(details)
+                break
+    
+    def print_status(self, force_simple=False):
+        """Print current status"""
+        if self.use_rich and not force_simple:
+            self._print_rich_status()
+        else:
+            self._print_simple_status()
+    
+    def _print_rich_status(self):
+        """Print status using Rich library"""
+        if not self.console:
+            return
+        
+        table = Table(show_header=False, box=None, padding=(0, 1))
+        table.add_column("Status", width=3)
+        table.add_column("Task")
+        
+        for task in self.tasks:
+            status_icon = task['status']
+            description = task['description']
+            
+            if task['status'] == TaskStatus.IN_PROGRESS:
+                description = f"[bold cyan]{description}[/bold cyan]"
+            elif task['status'] == TaskStatus.COMPLETED:
+                description = f"[green]{description}[/green]"
+            elif task['status'] == TaskStatus.FAILED:
+                description = f"[red]{description}[/red]"
+            elif task['status'] == TaskStatus.WARNING:
+                description = f"[yellow]{description}[/yellow]"
+            
+            table.add_row(status_icon, description)
+            
+            # Add details if any
+            for detail in task.get('details', []):
+                table.add_row("", f"  [dim]{detail}[/dim]")
+        
+        self.console.print(table)
+    
+    def _print_simple_status(self):
+        """Print status using simple text"""
+        for task in self.tasks:
+            status_icon = task['status']
+            description = task['description']
+            print(f"{status_icon} {description}")
+            
+            # Add details if any
+            for detail in task.get('details', []):
+                print(f"    {detail}")
+    
+    @contextmanager
+    def spinner(self, text: str):
+        """Context manager for spinner during operations"""
+        if self.use_rich and self.console:
+            with self.console.status(f"[bold cyan]{text}[/bold cyan]", spinner="dots") as status:
+                yield status
+        else:
+            print(f"🔄 {text}...")
+            yield None
+    
+    def success(self, message: str):
+        """Print success message"""
+        if self.use_rich:
+            self.console.print(f"[bold green]✅ {message}[/bold green]")
+        else:
+            print(f"✅ {message}")
+    
+    def error(self, message: str):
+        """Print error message"""
+        if self.use_rich:
+            self.console.print(f"[bold red]❌ {message}[/bold red]")
+        else:
+            print(f"❌ {message}")
+    
+    def warning(self, message: str):
+        """Print warning message"""
+        if self.use_rich:
+            self.console.print(f"[bold yellow]⚠️ {message}[/bold yellow]")
+        else:
+            print(f"⚠️ {message}")
+    
+    def info(self, message: str):
+        """Print info message"""
+        if self.use_rich:
+            self.console.print(f"[bold blue]ℹ️ {message}[/bold blue]")
+        else:
+            print(f"ℹ️ {message}")
+    
+    def panel(self, content: str, title: str = None):
+        """Print content in a panel"""
+        if self.use_rich:
+            self.console.print(Panel(content, title=title, border_style="blue"))
+        else:
+            border = "=" * 60
+            print(border)
+            if title:
+                print(f" {title}")
+                print(border)
+            print(content)
+            print(border)
+    
+    def details_section(self, title: str, items: List[str], collapsible: bool = True):
+        """Print a details section"""
+        if self.use_rich:
+            tree = Tree(f"[bold]{title}[/bold]")
+            for item in items:
+                tree.add(item)
+            self.console.print(tree)
+        else:
+            print(f"\n{title}:")
+            for item in items:
+                print(f"   • {item}")
+
+# Global UI instance
+ui = FancyUI()
 
 
 def sanitize_secrets(text: str) -> str:
@@ -560,31 +731,23 @@ class CloudRunDeployer:
         self.logger.info(f"Region: {self.region}")
         self.logger.info(f"Source directory: {source_dir}")
         
-        print(f"\n📋 Starting Cloud Run deployment...")
-        print(f"   • Service name: {service_name}")
-        print(f"   • Project: {self.project_id}")
-        print(f"   • Region: {self.region}")
-        print(f"   • Source directory: {source_dir}")
+        # Deployment info is now shown in main() function
         
         try:
-            # Set project
+            # Set project (done silently within the spinner)
             self.logger.info("Setting gcloud project...")
-            print("\n🔧 Setting gcloud project...")
             set_project_cmd = ['gcloud', 'config', 'set', 'project', self.project_id]
             self.logger.debug(f"Running command: {' '.join(set_project_cmd)}")
-            print(f"   Running: {' '.join(set_project_cmd)}")
             
             result = subprocess.run(set_project_cmd, check=True, capture_output=True, text=True)
             self.logger.debug(f"Set project result - stdout: {result.stdout}, stderr: {result.stderr}, returncode: {result.returncode}")
             
             if result.stdout.strip():
                 success_msg = f"Project set: {result.stdout.strip()}"
-                print(f"   ✅ {success_msg}")
                 self.logger.info(success_msg)
             
-            # Deploy to Cloud Run
+            # Deploy to Cloud Run (done within the spinner)
             self.logger.info("Starting Cloud Run deployment...")
-            print("\n🚀 Deploying to Cloud Run...")
             cmd = [
                 'gcloud', 'run', 'deploy', service_name,
                 '--source', source_dir,
@@ -593,8 +756,6 @@ class CloudRunDeployer:
                 '--allow-unauthenticated'
             ]
             self.logger.info(f"Running deployment command: {' '.join(cmd)}")
-            print(f"   Running: {' '.join(cmd)}")
-            print("   This may take a few minutes...")
             
             # Run deployment with real-time logging
             process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, 
@@ -620,8 +781,6 @@ class CloudRunDeployer:
             self.logger.debug(f"Process completed with return code: {return_code}")
             
             if return_code == 0:
-                print("\n🎉 Deployment successful!")
-                print(full_output)
                 self.logger.info("Deployment completed successfully")
                 self.logger.debug(f"Full deployment output:\n{full_output}")
                 return True
@@ -860,9 +1019,24 @@ Examples:
     
     args = parser.parse_args()
     
+    # Initialize UI
+    global ui
+    ui = FancyUI(use_rich=not getattr(args, 'simple_ui', False))
+    
+    # Setup main tasks
+    ui.add_task('validate', 'Validating configuration')
+    ui.add_task('parse_spec', 'Parsing specification file')  
+    ui.add_task('generate_code', 'Generating Cloud Run function code')
+    ui.add_task('write_files', 'Writing generated files')
+    ui.add_task('validate_files', 'Validating generated files')
+    ui.add_task('deploy', 'Deploying to Google Cloud Run')
+    
     # Validate configuration first
-    print("🔍 Validating configuration...")
-    errors, warnings = validate_configuration()
+    ui.update_task('validate', TaskStatus.IN_PROGRESS)
+    ui.print_status()
+    
+    with ui.spinner("Validating configuration"):
+        errors, warnings = validate_configuration()
     
     # Show warnings
     if warnings:
