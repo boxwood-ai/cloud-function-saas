@@ -335,6 +335,59 @@ cloud-function-saas/
 └── 🚀 generated/               # Generated deployments
 ```
 
+## 🚨 Troubleshooting
+
+### Common Docker Issues
+
+#### `Permission denied: 'gcloud'` Error
+If you see this error, rebuild the Docker image:
+```bash
+docker-compose build --no-cache cloud-function-saas
+```
+
+#### Authentication Issues
+```bash
+# Verify your authentication works
+docker-compose run --rm cloud-function-saas bash
+# Then inside the container:
+gcloud auth list
+gcloud config list
+```
+
+#### Volume Mount Issues on Windows
+```bash
+# Use forward slashes and full paths
+docker-compose run --rm -v C:/Users/YourName/.config/gcloud:/home/clouduser/.config/gcloud cloud-function-saas examples/example-spec.md
+```
+
+### Common Application Issues
+
+#### `ANTHROPIC_API_KEY not set`
+Ensure your `.env` file exists and contains:
+```env
+ANTHROPIC_API_KEY=your_actual_api_key_here
+GOOGLE_CLOUD_PROJECT=your-gcp-project-id
+```
+
+#### `Cloud Run API not enabled`
+Enable the Cloud Run API in your Google Cloud project:
+```bash
+gcloud services enable run.googleapis.com
+```
+
+#### Permission Issues in GCP
+Ensure your authenticated user has the following roles:
+- `Cloud Run Admin`
+- `Service Account User`
+- `Storage Admin` (for deployment artifacts)
+
+### Getting Help
+
+If you're still having issues:
+1. Check if your issue is already reported in [GitHub Issues](https://github.com/boxwood-ai/cloud-function-saas/issues)
+2. Run with `--verbose` flag for detailed output
+3. Include the full error message and your OS when reporting issues
+
 ## 🤝 Contributing
 
 We welcome contributions! Please see our [Contributing Guide](future/CONTRIBUTING.md) for details.
