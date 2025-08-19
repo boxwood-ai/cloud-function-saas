@@ -63,8 +63,15 @@ Choose your preferred method:
 3. **Authenticate with Google Cloud (one-time setup)**
 
    ```bash
-   # Run this once to authenticate (opens browser)
-   docker run --rm -it -v ~/.config/gcloud:/root/.config/gcloud google/cloud-sdk gcloud auth login
+   # Option A: Use your existing gcloud auth (if you have gcloud installed locally)
+   gcloud auth login
+   gcloud config set project your-gcp-project-id
+   
+   # Option B: Authenticate inside Docker container
+   docker run --rm -it \
+     -v ~/.config/gcloud:/root/.config/gcloud \
+     google/cloud-sdk:latest \
+     bash -c "gcloud auth login && gcloud config set project your-gcp-project-id"
    ```
 
 4. **You're ready to go!** 🎉
