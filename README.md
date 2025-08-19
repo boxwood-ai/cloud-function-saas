@@ -7,7 +7,7 @@
 [![Google Cloud](https://img.shields.io/badge/Google%20Cloud-Run-4285f4.svg)](https://cloud.google.com/run)
 [![Powered by Claude](https://img.shields.io/badge/Powered%20by-Claude%20AI-orange.svg)](https://www.anthropic.com/claude)
 
-*Transform specification documents into deployed Google Cloud Run microservices with AI*
+_Transform specification documents into deployed Google Cloud Run microservices with AI_
 
 [Quick Start](#quick-start) • [Examples](examples/) • [Documentation](future/goals.md) • [Contributing](future/CONTRIBUTING.md)
 
@@ -41,18 +41,51 @@ Before you begin, ensure you have:
 
 ### Installation
 
+Choose your preferred method:
+
+#### 🐳 Option 1: Docker (Recommended - No local setup required!)
+
 1. **Clone the repository**
+
    ```bash
-   git clone https://github.com/yourusername/cloud-function-saas.git
+   git clone https://github.com/boxwood-ai/cloud-function-saas.git
+   cd cloud-function-saas
+   ```
+
+2. **Set up environment variables**
+
+   ```bash
+   # Create .env file with your credentials
+   echo "ANTHROPIC_API_KEY=your_api_key_here" > .env
+   echo "GOOGLE_CLOUD_PROJECT=your-gcp-project-id" >> .env
+   ```
+
+3. **Authenticate with Google Cloud (one-time setup)**
+
+   ```bash
+   # Run this once to authenticate (opens browser)
+   docker run --rm -it -v ~/.config/gcloud:/root/.config/gcloud google/cloud-sdk gcloud auth login
+   ```
+
+4. **You're ready to go!** 🎉
+
+#### 🐍 Option 2: Local Python Setup
+
+1. **Clone the repository**
+
+   ```bash
+   git clone https://github.com/boxwood-ai/cloud-function-saas.git
    cd cloud-function-saas
    ```
 
 2. **Install dependencies**
+
    ```bash
    pip install -r requirements.txt
    ```
 
 3. **Configure Google Cloud**
+
    ```bash
    gcloud auth login
    gcloud config set project your-gcp-project-id
@@ -67,12 +100,35 @@ Before you begin, ensure you have:
 
 ### Your First Deployment
 
+#### 🐳 Using Docker
+
 1. **Validate your setup**
+
+   ```bash
+   docker-compose run --rm cloud-function-saas examples/example-spec.md --validate-only
+   ```
+
+2. **Deploy the example service**
+
+   ```bash
+   docker-compose run --rm cloud-function-saas examples/example-spec.md --verbose
+   ```
+
+3. **Test your deployed service**
+   ```bash
+   curl https://your-service-url.run.app/users
+   ```
+
+#### 🐍 Using Local Python
+
+1. **Validate your setup**
+
    ```bash
    python prototype.py examples/example-spec.md --validate-only
    ```
 
 2. **Deploy the example service**
+
    ```bash
    python prototype.py examples/example-spec.md --verbose
    ```
@@ -84,6 +140,55 @@ Before you begin, ensure you have:
 
 🎉 **That's it!** Your microservice is now live on Google Cloud Run.
 
+## 🐳 Docker Usage
+
+### Quick Commands
+
+```bash
+# Interactive shell in container
+docker-compose run --rm cloud-function-saas bash
+
+# Deploy a specific spec file
+docker-compose run --rm cloud-function-saas examples/user-api-nodejs.spec.md --verbose
+
+# Validate without deploying
+docker-compose run --rm cloud-function-saas examples/example-spec.md --validate-only
+
+# Keep generated files locally
+docker-compose run --rm cloud-function-saas examples/example-spec.md --output-dir /app/generated
+```
+
+### Custom Spec Files
+
+Create a `specs/` directory for your custom specifications:
+
+```bash
+# Create specs directory
+mkdir specs
+
+# Copy and edit a spec
+cp examples/example-spec.md specs/my-api.spec.md
+# Edit specs/my-api.spec.md with your requirements
+
+# Deploy your custom spec
+docker-compose run --rm cloud-function-saas specs/my-api.spec.md --verbose
+```
+
+### Advanced Docker Usage
+
+```bash
+# Build the image manually
+docker build -t cloud-function-saas .
+
+# Run with custom environment
+docker run --rm -it \
+  -v $(pwd)/examples:/app/examples \
+  -v $(pwd)/generated:/app/generated \
+  -e ANTHROPIC_API_KEY=your_key \
+  -e GOOGLE_CLOUD_PROJECT=your_project \
+  cloud-function-saas examples/example-spec.md --verbose
+```
+
 ## 📋 Writing Specifications
 
 Cloud Function SaaS uses a simple, intuitive markdown format that Claude AI can understand and transform into code.
@@ -92,21 +197,27 @@ Cloud Function SaaS uses a simple, intuitive markdown format that Claude AI can 
 
 ```markdown
 # Service Name: Your API Name
+
 Description: What your service does
 Runtime: Node.js 20
 
 ## Endpoints
+
 ### GET /resource
+
 - Description: What this endpoint does
 - Output: { expected: "response format" }
 
 ### POST /resource
+
 - Description: Create new resource
 - Input: { required: "input format" }
 - Output: { created: "resource" }
 
 ## Models
+
 ### ResourceModel
+
 - field1: string (required)
 - field2: number (optional)
 - createdAt: timestamp
@@ -114,12 +225,12 @@ Runtime: Node.js 20
 
 ### 🎯 Example Specifications
 
-| Service Type | Example | Description |
-|-------------|---------|-------------|
-| **User Management** | [`examples/user-api-nodejs.spec.md`](examples/user-api-nodejs.spec.md) | CRUD operations for users |
-| **Authentication** | [`examples/auth-service-go.spec.md`](examples/auth-service-go.spec.md) | JWT-based auth service |
-| **Data Processing** | [`examples/data-processor-python.spec.md`](examples/data-processor-python.spec.md) | Async data pipeline |
-| **Webhooks** | [`examples/webhook-handler-nodejs.spec.md`](examples/webhook-handler-nodejs.spec.md) | Event processing |
+| Service Type        | Example                                                                              | Description               |
+| ------------------- | ------------------------------------------------------------------------------------ | ------------------------- |
+| **User Management** | [`examples/user-api-nodejs.spec.md`](examples/user-api-nodejs.spec.md)               | CRUD operations for users |
+| **Authentication**  | [`examples/auth-service-go.spec.md`](examples/auth-service-go.spec.md)               | JWT-based auth service    |
+| **Data Processing** | [`examples/data-processor-python.spec.md`](examples/data-processor-python.spec.md)   | Async data pipeline       |
+| **Webhooks**        | [`examples/webhook-handler-nodejs.spec.md`](examples/webhook-handler-nodejs.spec.md) | Event processing          |
 
 > 💡 **Tip**: Start with the [basic example](examples/example-spec.md) and modify it for your needs.
 
@@ -147,13 +258,13 @@ GOOGLE_CLOUD_REGION=us-central1
 python prototype.py <spec-file> [options]
 ```
 
-| Option | Description | Example |
-|--------|-------------|---------|
-| `--project` | Override GCP project | `--project my-project` |
-| `--region` | Override deployment region | `--region europe-west1` |
-| `--output-dir` | Keep generated files | `--output-dir ./generated` |
-| `--validate-only` | Check setup without deploying | `--validate-only` |
-| `--verbose, -v` | Detailed output | `--verbose` |
+| Option            | Description                   | Example                    |
+| ----------------- | ----------------------------- | -------------------------- |
+| `--project`       | Override GCP project          | `--project my-project`     |
+| `--region`        | Override deployment region    | `--region europe-west1`    |
+| `--output-dir`    | Keep generated files          | `--output-dir ./generated` |
+| `--validate-only` | Check setup without deploying | `--validate-only`          |
+| `--verbose, -v`   | Detailed output               | `--verbose`                |
 
 ### Usage Examples
 
@@ -191,12 +302,12 @@ graph LR
 
 Cloud Function SaaS includes robust validation:
 
-| Check | Description | Status |
-|-------|-------------|--------|
-| 🔑 **API Keys** | Validates Anthropic API access | ✅ |
-| ☁️ **GCP Setup** | Checks `gcloud` auth and permissions | ✅ |
-| 📋 **Spec Format** | Validates specification syntax | ✅ |
-| 🚀 **Cloud Run** | Verifies service deployment | ✅ |
+| Check              | Description                          | Status |
+| ------------------ | ------------------------------------ | ------ |
+| 🔑 **API Keys**    | Validates Anthropic API access       | ✅     |
+| ☁️ **GCP Setup**   | Checks `gcloud` auth and permissions | ✅     |
+| 📋 **Spec Format** | Validates specification syntax       | ✅     |
+| 🚀 **Cloud Run**   | Verifies service deployment          | ✅     |
 
 > 💡 Use `--validate-only` to check your setup without deploying
 
@@ -224,7 +335,7 @@ We welcome contributions! Please see our [Contributing Guide](future/CONTRIBUTIN
 ### Development Setup
 
 ```bash
-git clone https://github.com/yourusername/cloud-function-saas.git
+git clone https://github.com/boxwood-ai/cloud-function-saas.git
 cd cloud-function-saas
 pip install -r requirements.txt
 python -m pytest tests/
@@ -237,8 +348,8 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 ## 🌟 Support
 
 - 📖 **Documentation**: [Project Goals & Roadmap](future/goals.md)
-- 🐛 **Issues**: [GitHub Issues](https://github.com/yourusername/cloud-function-saas/issues)
-- 💬 **Discussions**: [GitHub Discussions](https://github.com/yourusername/cloud-function-saas/discussions)
+- 🐛 **Issues**: [GitHub Issues](https://github.com/boxwood-ai/cloud-function-saas/issues)
+- 💬 **Discussions**: [GitHub Discussions](https://github.com/boxwood-ai/cloud-function-saas/discussions)
 
 ---
 
@@ -246,6 +357,6 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 
 **Made with ❤️ and AI**
 
-[⭐ Star this repo](https://github.com/yourusername/cloud-function-saas) • [🍴 Fork it](https://github.com/yourusername/cloud-function-saas/fork) • [📢 Share it](https://twitter.com/intent/tweet?text=Check%20out%20Cloud%20Function%20SaaS!)
+[⭐ Star this repo](https://github.com/boxwood-ai/cloud-function-saas) • [🍴 Fork it](https://github.com/boxwood-ai/cloud-function-saas/fork) • [📢 Share it](https://twitter.com/intent/tweet?text=Check%20out%20Cloud%20Function%20SaaS!)
 
 </div>

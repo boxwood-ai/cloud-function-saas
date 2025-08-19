@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  cloud-function-saas:
+    build: .
+    container_name: cloud-function-saas
+    volumes:
+      # Mount local examples and generated directories
+      - ./examples:/app/examples
+      - ./generated:/app/generated
+      # Mount your spec files (create this directory if needed)
+      - ./specs:/app/specs:ro
+      # Mount Google Cloud config (if available locally)
+      - ~/.config/gcloud:/home/clouduser/.config/gcloud:ro
+    environment:
+      # These will be loaded from .env file or environment variables
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - GOOGLE_CLOUD_PROJECT=${GOOGLE_CLOUD_PROJECT}
+      - CLAUDE_MODEL=${CLAUDE_MODEL:-}
+      - CLAUDE_MAX_TOKENS=${CLAUDE_MAX_TOKENS:-4000}
+      - CLAUDE_TEMPERATURE=${CLAUDE_TEMPERATURE:-0.1}
+      - GOOGLE_CLOUD_REGION=${GOOGLE_CLOUD_REGION:-us-central1}
+    # Override default command for interactive use
+    command: bash
+    stdin_open: true
+    tty: true
+    # Or use this to run a specific spec file:
+    # command: ["examples/example-spec.md", "--verbose"]
+
+  # Alternative service for one-off deployments
+  deploy:
+    build: .
+    container_name: cloud-function-saas-deploy
+    volumes:
+      - ./examples:/app/examples
+      - ./generated:/app/generated
+      - ./specs:/app/specs:ro
+      - ~/.config/gcloud:/home/clouduser/.config/gcloud:ro
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - GOOGLE_CLOUD_PROJECT=${GOOGLE_CLOUD_PROJECT}
+      - CLAUDE_MODEL=${CLAUDE_MODEL:-}
+      - CLAUDE_MAX_TOKENS=${CLAUDE_MAX_TOKENS:-4000}
+      - CLAUDE_TEMPERATURE=${CLAUDE_TEMPERATURE:-0.1}
+      - GOOGLE_CLOUD_REGION=${GOOGLE_CLOUD_REGION:-us-central1}
+    profiles:
+      - deploy
+    # This will run the deployment and exit
+    # Override with: docker-compose run deploy examples/your-spec.md --verbose
