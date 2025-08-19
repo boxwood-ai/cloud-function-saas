@@ -1,70 +1,135 @@
-# Cloud Function Microservice Generator
+# ⚡ Cloud Function SaaS
 
-> **📋 See [goals.md](goals.md) for the complete project vision and planned features**
+<div align="center">
 
-A Python prototype that transforms specification documents into deployed Google Cloud Run microservices using Claude AI.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![Google Cloud](https://img.shields.io/badge/Google%20Cloud-Run-4285f4.svg)](https://cloud.google.com/run)
+[![Powered by Claude](https://img.shields.io/badge/Powered%20by-Claude%20AI-orange.svg)](https://www.anthropic.com/claude)
 
-## Current Status
+*Transform specification documents into deployed Google Cloud Run microservices with AI*
 
-🚧 **Prototype Phase** - Basic spec-to-deployment pipeline working
+[Quick Start](#quick-start) • [Examples](examples/) • [Documentation](future/goals.md) • [Contributing](future/CONTRIBUTING.md)
 
-**What works now:**
-- Spec parsing from markdown files
-- Claude AI code generation 
-- Automatic Cloud Run deployment
-- Environment-based configuration
+</div>
 
-## Quick Start
+---
 
-### 1. Prerequisites
-```bash
-# Install Google Cloud SDK
-brew install google-cloud-sdk  # macOS
-# Or follow: https://cloud.google.com/sdk/docs/install
+## 🚀 What is Cloud Function SaaS?
 
-# Authenticate with Google Cloud
-gcloud auth login
-gcloud config set project your-gcp-project-id
+Cloud Function SaaS is an AI-powered tool that converts simple markdown specifications into fully deployed Google Cloud Run microservices. Write your API specification in plain English, and let Claude AI generate and deploy production-ready code.
+
+### ✨ Key Features
+
+- 📝 **Simple Specs**: Write APIs in markdown format
+- 🤖 **AI-Powered**: Claude AI generates production-ready code
+- ☁️ **Auto-Deploy**: Direct deployment to Google Cloud Run
+- 🔧 **Multi-Language**: Support for Node.js, Python, Go (planned)
+- ✅ **Validation**: Comprehensive setup and spec validation
+- 📊 **Verbose Logging**: Detailed deployment feedback
+
+## 🚀 Quick Start
+
+### Prerequisites
+
+Before you begin, ensure you have:
+
+- **Python 3.8+** installed
+- **Google Cloud SDK** ([Installation Guide](https://cloud.google.com/sdk/docs/install))
+- **Anthropic API key** ([Get yours here](https://console.anthropic.com/))
+- **Google Cloud project** with Cloud Run enabled
+
+### Installation
+
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/yourusername/cloud-function-saas.git
+   cd cloud-function-saas
+   ```
+
+2. **Install dependencies**
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+3. **Configure Google Cloud**
+   ```bash
+   gcloud auth login
+   gcloud config set project your-gcp-project-id
+   ```
+
+4. **Set up environment variables**
+   ```bash
+   # Create .env file with your credentials
+   echo "ANTHROPIC_API_KEY=your_api_key_here" > .env
+   echo "GOOGLE_CLOUD_PROJECT=your-gcp-project-id" >> .env
+   ```
+
+### Your First Deployment
+
+1. **Validate your setup**
+   ```bash
+   python prototype.py examples/example-spec.md --validate-only
+   ```
+
+2. **Deploy the example service**
+   ```bash
+   python prototype.py examples/example-spec.md --verbose
+   ```
+
+3. **Test your deployed service**
+   ```bash
+   curl https://your-service-url.run.app/users
+   ```
+
+🎉 **That's it!** Your microservice is now live on Google Cloud Run.
+
+## 📋 Writing Specifications
+
+Cloud Function SaaS uses a simple, intuitive markdown format that Claude AI can understand and transform into code.
+
+### Basic Spec Structure
+
+```markdown
+# Service Name: Your API Name
+Description: What your service does
+Runtime: Node.js 20
+
+## Endpoints
+### GET /resource
+- Description: What this endpoint does
+- Output: { expected: "response format" }
+
+### POST /resource
+- Description: Create new resource
+- Input: { required: "input format" }
+- Output: { created: "resource" }
+
+## Models
+### ResourceModel
+- field1: string (required)
+- field2: number (optional)
+- createdAt: timestamp
 ```
 
-### 2. Setup
-```bash
-# Clone and install dependencies
-pip install -r requirements.txt
+### 🎯 Example Specifications
 
-# Configure environment
-cp .env.example .env
-# Edit .env with your Anthropic API key and GCP project
-```
+| Service Type | Example | Description |
+|-------------|---------|-------------|
+| **User Management** | [`examples/user-api-nodejs.spec.md`](examples/user-api-nodejs.spec.md) | CRUD operations for users |
+| **Authentication** | [`examples/auth-service-go.spec.md`](examples/auth-service-go.spec.md) | JWT-based auth service |
+| **Data Processing** | [`examples/data-processor-python.spec.md`](examples/data-processor-python.spec.md) | Async data pipeline |
+| **Webhooks** | [`examples/webhook-handler-nodejs.spec.md`](examples/webhook-handler-nodejs.spec.md) | Event processing |
 
-### 3. Validate Configuration
-```bash
-# Check if everything is set up correctly
-python prototype.py example-spec.md --validate-only
-```
+> 💡 **Tip**: Start with the [basic example](examples/example-spec.md) and modify it for your needs.
 
-### 4. Create a Spec
-```bash
-# Use the example or create your own
-cp example-spec.md my-service-spec.md
-# Edit my-service-spec.md with your requirements
-```
+## ⚙️ Configuration
 
-### 5. Generate & Deploy
-```bash
-# Deploy to Cloud Run (with detailed output)
-python prototype.py my-service-spec.md --verbose
+### Environment Variables
 
-# Or use basic output
-python prototype.py my-service-spec.md
-```
+Create a `.env` file in your project root:
 
-That's it! Your microservice is now deployed and running on Cloud Run.
-
-## Configuration
-
-### Environment Variables (.env)
-```bash
+```env
 # Required
 ANTHROPIC_API_KEY=your_claude_api_key
 GOOGLE_CLOUD_PROJECT=your-gcp-project-id
@@ -76,95 +141,111 @@ CLAUDE_TEMPERATURE=0.1
 GOOGLE_CLOUD_REGION=us-central1
 ```
 
-## Spec Format
-
-Simple markdown format that Claude understands:
-
-```markdown
-# Service Name: User API
-Description: Simple user management microservice
-Runtime: Node.js 20
-
-## Endpoints
-### GET /users
-- Description: Get all users
-- Output: { users: array }
-
-### POST /users
-- Description: Create a new user
-- Input: { name: string, email: string }
-- Output: { user: User, id: string }
-
-## Models
-### User
-- id: string (UUID)
-- name: string (required)
-- email: string (required, unique)
-- createdAt: timestamp
-```
-
-See [example-spec.md](example-spec.md) for a working example.
-
-## How It Works
-
-1. **Parse** the spec.md file into structured data
-2. **Generate** Node.js Cloud Run function using Claude AI
-3. **Deploy** directly to Google Cloud Run
-4. **Return** the deployed service URL
-
-## Command Options
+### Command Line Options
 
 ```bash
 python prototype.py <spec-file> [options]
-
-Options:
-  --project PROJECT     Override Google Cloud project ID
-  --region REGION       Override deployment region  
-  --output-dir DIR      Keep generated files in directory
-  --validate-only       Only validate configuration, don't deploy
-  --verbose, -v         Show detailed output and next steps
 ```
 
-**Examples:**
+| Option | Description | Example |
+|--------|-------------|---------|
+| `--project` | Override GCP project | `--project my-project` |
+| `--region` | Override deployment region | `--region europe-west1` |
+| `--output-dir` | Keep generated files | `--output-dir ./generated` |
+| `--validate-only` | Check setup without deploying | `--validate-only` |
+| `--verbose, -v` | Detailed output | `--verbose` |
+
+### Usage Examples
+
 ```bash
-# Basic usage
+# Basic deployment
 python prototype.py my-spec.md
 
-# With detailed output
-python prototype.py my-spec.md --verbose
+# Detailed output with file preservation
+python prototype.py my-spec.md --verbose --output-dir ./generated
 
-# Just validate setup
+# Validation only
 python prototype.py my-spec.md --validate-only
 
-# Override project
-python prototype.py my-spec.md --project my-other-project
-
-# Keep generated files
-python prototype.py my-spec.md --output-dir ./generated
+# Custom project and region
+python prototype.py my-spec.md --project my-project --region europe-west1
 ```
 
-## Error Handling
+## 🔧 How It Works
 
-The prototype includes comprehensive validation:
+```mermaid
+graph LR
+    A[📝 Spec File] --> B[🔍 Parse]
+    B --> C[🤖 Claude AI]
+    C --> D[📦 Generate Code]
+    D --> E[☁️ Deploy to Cloud Run]
+    E --> F[🌐 Live Service URL]
+```
 
-- ✅ **API Key Check**: Validates Anthropic API key and permissions
-- ✅ **Google Cloud Setup**: Checks gcloud installation and authentication  
-- ✅ **Project Access**: Verifies Cloud Run is enabled in your project
-- ✅ **Spec Validation**: Ensures your spec file is valid and readable
+1. **📋 Parse** - Extract structure from your markdown spec
+2. **🤖 Generate** - Claude AI creates production-ready code
+3. **☁️ Deploy** - Automatic deployment to Google Cloud Run
+4. **✅ Validate** - Comprehensive checks at every step
 
-Run with `--validate-only` to check your setup without deploying.
+## 🛡️ Validation & Error Handling
 
-## Requirements
+Cloud Function SaaS includes robust validation:
 
-- Python 3.8+
-- Google Cloud SDK (`gcloud` CLI) - [Install Guide](https://cloud.google.com/sdk/docs/install)
-- Anthropic API key - [Get one here](https://console.anthropic.com/)
-- Google Cloud project with Cloud Run enabled
+| Check | Description | Status |
+|-------|-------------|--------|
+| 🔑 **API Keys** | Validates Anthropic API access | ✅ |
+| ☁️ **GCP Setup** | Checks `gcloud` auth and permissions | ✅ |
+| 📋 **Spec Format** | Validates specification syntax | ✅ |
+| 🚀 **Cloud Run** | Verifies service deployment | ✅ |
 
-## Generated Output
+> 💡 Use `--validate-only` to check your setup without deploying
 
-The prototype currently generates:
-- `index.js` - Express.js Cloud Run function
-- `package.json` - Node.js dependencies and configuration
+## 📁 Project Structure
 
-Future versions will generate the full microservice structure outlined in [goals.md](goals.md).
+```
+cloud-function-saas/
+├── 📋 README.md                 # You are here
+├── 🐍 prototype.py             # Main CLI tool
+├── 📦 requirements.txt         # Python dependencies
+├── 🔧 src/                     # Core modules
+│   ├── core/                   # Parser & generator
+│   └── providers/              # Cloud providers
+├── 📚 examples/                # Example specifications
+│   ├── user-api-nodejs.spec.md
+│   ├── auth-service-go.spec.md
+│   └── data-processor-python.spec.md
+└── 🚀 generated/               # Generated deployments
+```
+
+## 🤝 Contributing
+
+We welcome contributions! Please see our [Contributing Guide](future/CONTRIBUTING.md) for details.
+
+### Development Setup
+
+```bash
+git clone https://github.com/yourusername/cloud-function-saas.git
+cd cloud-function-saas
+pip install -r requirements.txt
+python -m pytest tests/
+```
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🌟 Support
+
+- 📖 **Documentation**: [Project Goals & Roadmap](future/goals.md)
+- 🐛 **Issues**: [GitHub Issues](https://github.com/yourusername/cloud-function-saas/issues)
+- 💬 **Discussions**: [GitHub Discussions](https://github.com/yourusername/cloud-function-saas/discussions)
+
+---
+
+<div align="center">
+
+**Made with ❤️ and AI**
+
+[⭐ Star this repo](https://github.com/yourusername/cloud-function-saas) • [🍴 Fork it](https://github.com/yourusername/cloud-function-saas/fork) • [📢 Share it](https://twitter.com/intent/tweet?text=Check%20out%20Cloud%20Function%20SaaS!)
+
+</div>
