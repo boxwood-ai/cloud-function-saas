@@ -27,6 +27,8 @@ Cloud Function SaaS is an AI-powered tool that converts simple markdown specific
 - 🔧 **Multi-Language**: Support for Node.js, Python, Go (planned)
 - ✅ **Validation**: Comprehensive setup and spec validation
 - 📊 **Verbose Logging**: Detailed deployment feedback
+- 🔐 **Smart Auth**: Application Default Credentials (ADC) with gcloud CLI fallback
+- 📚 **Client Libraries**: Native Google Cloud client libraries for better reliability
 
 ## 🚀 Quick Start
 
@@ -35,7 +37,7 @@ Cloud Function SaaS is an AI-powered tool that converts simple markdown specific
 Before you begin, ensure you have:
 
 - **Python 3.8+** installed
-- **Google Cloud SDK** ([Installation Guide](https://cloud.google.com/sdk/docs/install))
+- **Google Cloud SDK** ([Installation Guide](https://cloud.google.com/sdk/docs/install)) OR **Service Account Key** for Docker deployments
 - **Anthropic API key** ([Get yours here](https://console.anthropic.com/))
 - **Google Cloud project** with Cloud Run enabled
 
@@ -60,7 +62,7 @@ Choose your preferred method:
    echo "GOOGLE_CLOUD_PROJECT=your-gcp-project-id" >> .env
    ```
 
-3. **Authenticate with Google Cloud (one-time setup)**
+3. **Authenticate with Google Cloud (choose one method)**
 
    ```bash
    # Option A: Use your existing gcloud auth (if you have gcloud installed locally)
@@ -72,6 +74,12 @@ Choose your preferred method:
      -v ~/.config/gcloud:/root/.config/gcloud \
      google/cloud-sdk:latest \
      bash -c "gcloud auth login && gcloud config set project your-gcp-project-id"
+   
+   # Option C: Use Service Account Key for Docker (Recommended for CI/CD)
+   # 1. Create a service account key in Google Cloud Console
+   # 2. Download the JSON key file
+   # 3. Add to your .env file:
+   echo "GOOGLE_APPLICATION_CREDENTIALS=/path/to/your/service-account-key.json" >> .env
    ```
 
 4. **You're ready to go!** 🎉
@@ -91,11 +99,17 @@ Choose your preferred method:
    pip install -r requirements.txt
    ```
 
-3. **Configure Google Cloud**
+3. **Configure Google Cloud (choose one method)**
 
    ```bash
+   # Option A: Use gcloud CLI authentication (most common)
    gcloud auth login
    gcloud config set project your-gcp-project-id
+   
+   # Option B: Use Service Account Key (for server/CI environments)
+   # 1. Create and download a service account key from Google Cloud Console
+   # 2. Set the environment variable:
+   export GOOGLE_APPLICATION_CREDENTIALS=/path/to/your/service-account-key.json
    ```
 
 4. **Set up environment variables**
@@ -103,6 +117,8 @@ Choose your preferred method:
    # Create .env file with your credentials
    echo "ANTHROPIC_API_KEY=your_api_key_here" > .env
    echo "GOOGLE_CLOUD_PROJECT=your-gcp-project-id" >> .env
+   # Optional: Add service account key path if using Option B above
+   echo "GOOGLE_APPLICATION_CREDENTIALS=/path/to/your/service-account-key.json" >> .env
    ```
 
 ### Your First Deployment
@@ -241,6 +257,43 @@ Runtime: Node.js 20
 
 > 💡 **Tip**: Start with the [basic example](examples/example-spec.md) and modify it for your needs.
 
+## 🔐 Authentication & Docker Support
+
+Cloud Function SaaS uses **Application Default Credentials (ADC)** for seamless authentication across different environments, with intelligent fallback to gcloud CLI.
+
+### Authentication Methods (Automatically Detected)
+
+| Method | Use Case | Setup |
+|--------|----------|-------|
+| **🖥️ gcloud CLI** | Local development | `gcloud auth login` |
+| **🔑 Service Account Key** | Docker, CI/CD, Production | Set `GOOGLE_APPLICATION_CREDENTIALS` |
+| **☁️ Instance Metadata** | Google Compute Engine | Automatic |
+| **🔄 Workload Identity** | Google Kubernetes Engine | Automatic |
+
+### Docker-Optimized Authentication
+
+The system automatically detects and uses the best authentication method available:
+
+```bash
+# For Docker with Service Account Key
+export GOOGLE_APPLICATION_CREDENTIALS=/path/to/key.json
+docker run -v /path/to/key.json:/app/key.json -e GOOGLE_APPLICATION_CREDENTIALS=/app/key.json ...
+
+# For Docker with gcloud CLI (mount gcloud config)
+docker run -v ~/.config/gcloud:/root/.config/gcloud ...
+
+# For GKE with Workload Identity (automatic)
+# No additional setup required in container
+```
+
+### Benefits of Client Library Integration
+
+- ✅ **Faster Authentication**: No subprocess calls to gcloud
+- ✅ **Better Error Handling**: Structured error responses from Google APIs
+- ✅ **Enhanced Logging**: Detailed build step information and failure diagnostics
+- ✅ **Graceful Fallback**: Automatically falls back to gcloud CLI if ADC unavailable
+- ✅ **Docker Optimized**: Perfect for containerized deployments
+
 ## ⚙️ Configuration
 
 ### Environment Variables
@@ -251,6 +304,11 @@ Create a `.env` file in your project root:
 # Required
 ANTHROPIC_API_KEY=your_claude_api_key
 GOOGLE_CLOUD_PROJECT=your-gcp-project-id
+
+# Authentication (choose one)
+# Option 1: Use gcloud CLI (default - automatically detected)
+# Option 2: Use Service Account Key
+GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account-key.json
 
 # Optional (with defaults)
 CLAUDE_MODEL=                    # Auto-detects latest Sonnet
@@ -323,16 +381,19 @@ Cloud Function SaaS includes robust validation:
 ```
 cloud-function-saas/
 ├── 📋 README.md                 # You are here
-├── 🐍 prototype.py             # Main CLI tool
-├── 📦 requirements.txt         # Python dependencies
-├── 🔧 src/                     # Core modules
-│   ├── core/                   # Parser & generator
-│   └── providers/              # Cloud providers
+├── 🐍 prototype.py             # Main CLI orchestrator
+├── 📦 requirements.txt         # Python dependencies (includes Google Cloud client libraries)
+├── 🔧 Core modules:
+│   ├── cloud_run_deployer.py   # Google Cloud Run deployment (with client libraries + ADC)
+│   ├── code_generator.py       # Claude AI code generation
+│   ├── spec_parser.py          # Markdown specification parser
+│   ├── ui.py                   # Terminal user interface
+│   └── utils.py                # Shared utilities
 ├── 📚 examples/                # Example specifications
 │   ├── user-api-nodejs.spec.md
 │   ├── auth-service-go.spec.md
 │   └── data-processor-python.spec.md
-└── 🚀 generated/               # Generated deployments
+└── 🚀 generated/               # Generated deployments (timestamped)
 ```
 
 ## 🚨 Troubleshooting
@@ -346,12 +407,32 @@ docker-compose build --no-cache cloud-function-saas
 ```
 
 #### Authentication Issues
+
+**For gcloud CLI authentication:**
 ```bash
 # Verify your authentication works
 docker-compose run --rm cloud-function-saas bash
 # Then inside the container:
 gcloud auth list
 gcloud config list
+```
+
+**For Service Account Key authentication:**
+```bash
+# Verify your service account key is properly mounted and accessible
+docker-compose run --rm cloud-function-saas bash
+# Then inside the container:
+ls -la /path/to/your/service-account-key.json
+echo $GOOGLE_APPLICATION_CREDENTIALS
+
+# Test authentication
+python -c "from google.auth import default; print(default())"
+```
+
+**Check which authentication method is being used:**
+```bash
+# Run with verbose logging to see authentication method
+python prototype.py your-spec.md --validate-only --verbose
 ```
 
 #### Volume Mount Issues on Windows

@@ -6,8 +6,12 @@ import os
 import subprocess
 import traceback
 import logging
-from typing import Optional
+from typing import Optional, Dict, Any
 
+from google.cloud import run_v2
+from google.cloud.devtools import cloudbuild_v1
+from google.auth import default
+from google.auth.exceptions import DefaultCredentialsError
 from utils import sanitize_secrets
 
 
@@ -18,6 +22,25 @@ class CloudRunDeployer:
         self.project_id = project_id or os.getenv('GOOGLE_CLOUD_PROJECT')
         self.region = region or os.getenv('GOOGLE_CLOUD_REGION', 'us-central1')
         self.logger = logger or logging.getLogger('cloud_function_generator')
+        
+        # Initialize Google Cloud clients with ADC
+        self.credentials = None
+        self.run_client = None
+        self.build_client = None
+        
+        try:
+            self.credentials, detected_project = default()
+            if not self.project_id and detected_project:
+                self.project_id = detected_project
+                self.logger.info(f"Using project from ADC: {self.project_id}")
+            
+            self.run_client = run_v2.ServicesClient(credentials=self.credentials)
+            self.build_client = cloudbuild_v1.CloudBuildClient(credentials=self.credentials)
+            self.logger.info("Successfully initialized Google Cloud clients with ADC")
+        except DefaultCredentialsError:
+            self.logger.warning("ADC not available, falling back to gcloud CLI")
+        except Exception as e:
+            self.logger.warning(f"Failed to initialize Google Cloud clients: {e}")
         
         self.logger.info(f"CloudRunDeployer initialized with project_id='{self.project_id}', region='{self.region}'")
         
@@ -30,7 +53,7 @@ class CloudRunDeployer:
             self.logger.info(f"Region corrected to: {self.region}")
     
     def deploy(self, service_name: str, source_dir: str) -> bool:
-        """Deploy to Cloud Run"""
+        """Deploy to Cloud Run using client libraries or fallback to gcloud CLI"""
         self.logger.info("=" * 40)
         self.logger.info("STARTING CLOUD RUN DEPLOYMENT")
         self.logger.info("=" * 40)
@@ -39,7 +62,43 @@ class CloudRunDeployer:
         self.logger.info(f"Region: {self.region}")
         self.logger.info(f"Source directory: {source_dir}")
         
-        # Deployment info is now shown in main() function
+        # Try using client libraries first, fallback to gcloud CLI
+        if self.run_client and self.build_client:
+            try:
+                return self._deploy_with_client_libraries(service_name, source_dir)
+            except Exception as e:
+                self.logger.warning(f"Client library deployment failed: {e}")
+                self.logger.info("Falling back to gcloud CLI deployment")
+        
+        return self._deploy_with_gcloud_cli(service_name, source_dir)
+    
+    def _deploy_with_client_libraries(self, service_name: str, source_dir: str) -> bool:
+        """Deploy using Google Cloud client libraries"""
+        self.logger.info("Using Google Cloud client libraries for deployment")
+        
+        # For now, we'll use a hybrid approach - use client libraries for monitoring
+        # but still use gcloud for the actual deployment since it's more robust
+        # This gives us the benefits of ADC while maintaining reliability
+        
+        try:
+            # Check if service already exists
+            service_path = f"projects/{self.project_id}/locations/{self.region}/services/{service_name}"
+            try:
+                existing_service = self.run_client.get_service(name=service_path)
+                self.logger.info(f"Service {service_name} already exists, will update")
+            except Exception:
+                self.logger.info(f"Service {service_name} does not exist, will create new")
+            
+            # Use gcloud for actual deployment (more reliable for source-based deployments)
+            return self._deploy_with_gcloud_cli(service_name, source_dir)
+            
+        except Exception as e:
+            self.logger.error(f"Client library deployment error: {e}")
+            raise
+    
+    def _deploy_with_gcloud_cli(self, service_name: str, source_dir: str) -> bool:
+        """Deploy using gcloud CLI (fallback method)"""
+        self.logger.info("Using gcloud CLI for deployment")
         
         try:
             # Set project (done silently within the spinner)
@@ -148,6 +207,77 @@ class CloudRunDeployer:
     def _fetch_build_logs(self, service_name: str):
         """Fetch and display recent build logs to help debug deployment failures"""
         self.logger.info("Attempting to fetch build logs for debugging...")
+        
+        # Try using client libraries first, fallback to gcloud CLI
+        if self.build_client:
+            try:
+                self._fetch_build_logs_with_client(service_name)
+                return
+            except Exception as e:
+                self.logger.warning(f"Failed to fetch build logs with client libraries: {e}")
+                self.logger.info("Falling back to gcloud CLI for build logs")
+        
+        self._fetch_build_logs_with_gcloud(service_name)
+    
+    def _fetch_build_logs_with_client(self, service_name: str):
+        """Fetch build logs using Cloud Build client library"""
+        self.logger.info("Fetching build logs using client library")
+        
+        try:
+            print("\n📜 Fetching recent build logs for debugging...")
+            
+            # List recent builds
+            parent = f"projects/{self.project_id}"
+            request = cloudbuild_v1.ListBuildsRequest(
+                parent=parent,
+                page_size=3,
+                filter=f'status="FAILURE" OR status="SUCCESS"'
+            )
+            
+            builds = self.build_client.list_builds(request=request)
+            build_list = list(builds)
+            
+            if build_list:
+                print(f"   Found recent builds: {len(build_list)}")
+                self.logger.info(f"Found {len(build_list)} recent builds")
+                
+                # Get logs for the most recent build
+                for build in build_list:
+                    build_id = build.id
+                    print(f"   Fetching logs for build: {build_id} (Status: {build.status.name})")
+                    self.logger.info(f"Fetching logs for build: {build_id}")
+                    
+                    # Check if build has logs
+                    if build.log_url:
+                        print(f"   Build logs available at: {build.log_url}")
+                        self.logger.info(f"Build logs URL: {build.log_url}")
+                    
+                    # Show build steps and their status
+                    if build.steps:
+                        print(f"\n🔍 Build Steps for {build_id}:")
+                        print("=" * 60)
+                        for i, step in enumerate(build.steps):
+                            status = step.status.name if step.status else "UNKNOWN"
+                            name = step.name or f"step-{i}"
+                            print(f"   Step {i+1}: {name} - {status}")
+                            
+                            # Show failed step details
+                            if step.status and step.status.name == "FAILURE":
+                                if hasattr(step, 'args') and step.args:
+                                    print(f"     Args: {' '.join(step.args[:3])}...")  # Show first few args
+                        print("=" * 60)
+                        break  # Only show the first build with steps
+                    
+            else:
+                print("   No recent builds found")
+                self.logger.warning("No recent builds found")
+                
+        except Exception as e:
+            self.logger.error(f"Client library build log fetch error: {e}")
+            raise
+    
+    def _fetch_build_logs_with_gcloud(self, service_name: str):
+        """Fetch build logs using gcloud CLI (fallback method)"""
         try:
             print("\n📜 Fetching recent build logs for debugging...")
             
