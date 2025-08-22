@@ -500,4 +500,8 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 
 [⭐ Star this repo](https://github.com/boxwood-ai/cloud-function-saas) • [🍴 Fork it](https://github.com/boxwood-ai/cloud-function-saas/fork) • [📢 Share it](https://twitter.com/intent/tweet?text=Check%20out%20Cloud%20Function%20SaaS!)
 
+## ⭐ Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=boxwood-ai/cloud-function-saas&type=Date)](https://star-history.com/#boxwood-ai/cloud-function-saas&Date)
+
 </div>
