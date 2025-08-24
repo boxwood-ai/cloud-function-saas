@@ -37,7 +37,7 @@ output "service_account_id" {
 
 output "latest_revision_name" {
   description = "Name of the latest revision"
-  value       = google_cloud_run_service.service.status[0].latest_revision_name
+  value       = google_cloud_run_service.service.status[0].latest_ready_revision_name
 }
 
 output "container_image" {

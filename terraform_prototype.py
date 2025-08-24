@@ -27,6 +27,7 @@ from ui import FancyUI, TaskStatus
 from spec_parser import SpecParser
 from terraform_code_generator import TerraformCodeGenerator
 from terraform_deployer import TerraformDeployer
+from terraform_validator import TerraformValidator
 from utils import setup_logging, validate_configuration
 
 load_dotenv()
@@ -276,7 +277,31 @@ Examples:
         print(f"\n❌ Error parsing spec file: {e}")
         sys.exit(1)
     
-    # Step 3: Generate code and Terraform configuration
+    # Step 3: Create output directory and setup logging (moved earlier)
+    if args.output_dir:
+        output_dir = args.output_dir
+    else:
+        # Create timestamped directory in generated folder
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        service_name_clean = (spec.name or 'unnamed').lower().replace(' ', '-').replace('_', '-')
+        provider_suffix = '-'.join(providers) if len(providers) > 1 else providers[0]
+        output_dir = os.path.join('generated', f'{timestamp}_{service_name_clean}_{provider_suffix}')
+    
+    try:
+        os.makedirs(output_dir, exist_ok=True)
+        if args.debug:
+            print(f"🔍 Debug - Created output directory: {output_dir}")
+    except Exception as e:
+        print(f"❌ Error creating output directory: {e}")
+        sys.exit(1)
+    
+    # Setup logging now that we have the output directory
+    logger = setup_logging(output_dir, args.debug)
+    logger.info("Terraform deployment session started")
+    logger.info(f"Arguments: spec_file={args.spec_file}, providers={providers}, output_dir={args.output_dir}")
+    logger.info(f"Output directory: {output_dir}")
+
+    # Step 4: Generate code and Terraform configuration
     if args.legacy:
         # Use legacy code generation
         from code_generator import CodeGenerator
@@ -314,8 +339,23 @@ Examples:
             readme_content = terraform_generator.generate_deployment_readme(spec, providers)
             generated_files['README-DEPLOYMENT.md'] = readme_content
             
-            ui.update_task('generate_terraform', TaskStatus.COMPLETED)
-            print(f"✅ Generated {len(generated_files)} files successfully")
+            print(f"✅ Generated {len(generated_files)} files initially")
+            
+            # Validate and auto-fix generated files
+            print("🔍 Validating and auto-fixing generated Terraform configuration...")
+            validator = TerraformValidator(logger)
+            validation_success, fixed_files = validator.validate_and_fix(
+                generated_files, spec, providers, output_dir, max_retries=3
+            )
+            
+            if not validation_success:
+                ui.update_task('generate_terraform', TaskStatus.FAILED)
+                print("❌ Error: Failed to generate valid Terraform configuration after auto-fix attempts")
+                print("💡 Generated files have been saved, but may require manual fixes")
+            else:
+                generated_files = fixed_files
+                ui.update_task('generate_terraform', TaskStatus.COMPLETED)
+                print(f"✅ Generated and validated {len(generated_files)} files successfully")
             
             if args.verbose:
                 terraform_files = [f for f in generated_files.keys() if f.endswith('.tf') or f.endswith('.tfvars')]
@@ -327,30 +367,6 @@ Examples:
             ui.update_task('generate_terraform', TaskStatus.FAILED)
             print(f"❌ Error generating Terraform configuration: {e}")
             sys.exit(1)
-    
-    # Step 4: Create output directory and setup logging
-    if args.output_dir:
-        output_dir = args.output_dir
-    else:
-        # Create timestamped directory in generated folder
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        service_name_clean = (spec.name or 'unnamed').lower().replace(' ', '-').replace('_', '-')
-        provider_suffix = '-'.join(providers) if len(providers) > 1 else providers[0]
-        output_dir = os.path.join('generated', f'{timestamp}_{service_name_clean}_{provider_suffix}')
-    
-    try:
-        os.makedirs(output_dir, exist_ok=True)
-        if args.debug:
-            print(f"🔍 Debug - Created output directory: {output_dir}")
-    except Exception as e:
-        print(f"❌ Error creating output directory: {e}")
-        sys.exit(1)
-    
-    # Setup logging now that we have the output directory
-    logger = setup_logging(output_dir, args.debug)
-    logger.info("Terraform deployment session started")
-    logger.info(f"Arguments: spec_file={args.spec_file}, providers={providers}, output_dir={args.output_dir}")
-    logger.info(f"Output directory: {output_dir}")
     
     # Step 5: Write generated files
     ui.update_task('write_files', TaskStatus.IN_PROGRESS)
@@ -423,7 +439,16 @@ Examples:
             else:
                 print(f"   ⚠️ Could not determine Terraform version")
             
-            # Validate Terraform files
+            # Initialize Terraform first to install modules
+            print("   🔄 Initializing Terraform...")
+            if not deployer.init_terraform():
+                ui.update_task('validate_terraform', TaskStatus.FAILED)
+                print("❌ Terraform initialization failed")
+                sys.exit(1)
+            
+            print("   ✅ Terraform initialized successfully")
+            
+            # Now validate Terraform files
             valid, validation_errors = deployer.validate_terraform_files()
             if not valid:
                 ui.update_task('validate_terraform', TaskStatus.FAILED)
@@ -462,9 +487,15 @@ Examples:
                     print("❌ Terraform initialization failed")
                     sys.exit(1)
                 
-                # Create plan
+                # Create plan - use the generated tfvars file
+                tfvars_file = args.terraform_var_file
+                if not tfvars_file:
+                    # Auto-detect the provider-specific tfvars file
+                    if len(providers) == 1:
+                        tfvars_file = f'terraform-{providers[0]}.tfvars'
+                    
                 plan_success, plan_output = deployer.plan_deployment(
-                    var_file=args.terraform_var_file
+                    var_file=tfvars_file
                 )
                 
                 if plan_success:

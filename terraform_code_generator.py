@@ -156,11 +156,40 @@ Generate a complete multi-cloud serverless deployment for the following service 
 - Use HTTPS/TLS for all communications
 - Store sensitive configuration in cloud secret managers
 
+**CRITICAL: You MUST generate ALL required files in the exact format specified below.**
+
 **Format your response as:**
 ```
 FILE: filename.ext
 content of the file
 ```
+
+**REQUIRED FILES (you must generate ALL of these):**
+
+1. **APPLICATION FILES** (choose based on runtime):
+   - FILE: package.json (for Node.js)
+   - FILE: index.js (for Node.js) 
+   - FILE: requirements.txt (for Python)
+   - FILE: main.py (for Python)
+   - FILE: Dockerfile
+
+2. **TERRAFORM CONFIGURATION FILES** (ALL required):
+   - FILE: main.tf
+   - FILE: variables.tf  
+   - FILE: outputs.tf
+
+3. **TERRAFORM VARIABLES FILES** (for each provider):
+   - FILE: terraform-gcp.tfvars (if deploying to GCP)
+   - FILE: terraform-aws.tfvars (if deploying to AWS)
+
+**VALIDATION CHECKLIST - Ensure every response includes:**
+✅ Application code files (package.json/requirements.txt + main code file + Dockerfile)  
+✅ main.tf (with terraform block, providers, and modules)
+✅ variables.tf (with all required variables for chosen providers)
+✅ outputs.tf (with service_url and deployment info outputs)
+✅ Provider-specific .tfvars files
+
+**If you don't generate ALL required files, the deployment will fail!**
 
 For Terraform files, make sure to:
 1. Reference the correct module paths (terraform/modules/gcp-serverless, terraform/modules/aws-serverless)
