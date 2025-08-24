@@ -13,7 +13,7 @@ class ServiceSpec:
     description: str
     runtime: str
     endpoints: List[Dict[str, Any]]
-    models: List[Dict[str, Any]]
+    models: Dict[str, Any]
     business_logic: Optional[str] = None
     database: Optional[Dict[str, Any]] = None
     deployment: Optional[Dict[str, Any]] = None
@@ -30,7 +30,7 @@ class SpecParser:
             'description': '',
             'runtime': 'Node.js 20',
             'endpoints': [],
-            'models': [],
+            'models': {},
             'business_logic': None,
             'database': None,
             'deployment': None
@@ -90,13 +90,10 @@ class SpecParser:
             # Parse model definitions
             elif current_section == 'models' and line.startswith('### '):
                 model_name = line.replace('### ', '')
-                current_model = {
-                    'name': model_name,
-                    'fields': []
-                }
-                spec_data['models'].append(current_model)
+                current_model = model_name
+                spec_data['models'][model_name] = []
             elif current_section == 'models' and current_model and line.startswith('- '):
                 field_def = line[2:]
-                current_model['fields'].append(field_def)
+                spec_data['models'][current_model].append(field_def)
         
         return ServiceSpec(**spec_data)

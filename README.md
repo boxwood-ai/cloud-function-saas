@@ -17,18 +17,19 @@ _Transform specification documents into deployed Google Cloud Run microservices 
 
 ## 🚀 What is Cloud Function SaaS?
 
-Cloud Function SaaS is an AI-powered tool that converts simple markdown specifications into fully deployed Google Cloud Run microservices. Write your API specification in plain English, and let Claude AI generate and deploy production-ready code.
+Cloud Function SaaS is an AI-powered tool that converts simple markdown specifications into fully deployed multi-cloud microservices using Terraform. Write your API specification in plain English, and let Claude AI generate and deploy production-ready code to Google Cloud Platform, Amazon Web Services, or both simultaneously.
 
 ### ✨ Key Features
 
 - 📝 **Simple Specs**: Write APIs in markdown format
-- 🤖 **AI-Powered**: Claude AI generates production-ready code
-- ☁️ **Auto-Deploy**: Direct deployment to Google Cloud Run
+- 🤖 **AI-Powered**: Claude AI generates production-ready code + Terraform infrastructure
+- ☁️ **Multi-Cloud**: Deploy to GCP, AWS, or both simultaneously using Terraform
+- 🏗️ **Infrastructure as Code**: Complete Terraform configurations generated automatically
 - 🔧 **Multi-Language**: Support for Node.js, Python, Go (planned)
 - ✅ **Validation**: Comprehensive setup and spec validation
 - 📊 **Verbose Logging**: Detailed deployment feedback
-- 🔐 **Smart Auth**: Application Default Credentials (ADC) with gcloud CLI fallback
-- 📚 **Client Libraries**: Native Google Cloud client libraries for better reliability
+- 🔐 **Smart Auth**: Multi-cloud authentication (ADC for GCP, AWS CLI for AWS)
+- 🔄 **State Management**: Automatic Terraform state management and backend configuration
 
 ## 🚀 Quick Start
 
@@ -37,9 +38,11 @@ Cloud Function SaaS is an AI-powered tool that converts simple markdown specific
 Before you begin, ensure you have:
 
 - **Python 3.8+** installed
-- **Google Cloud SDK** ([Installation Guide](https://cloud.google.com/sdk/docs/install)) OR **Service Account Key** for Docker deployments
+- **Terraform** (v1.5+) ([Installation Guide](https://learn.hashicorp.com/tutorials/terraform/install-cli))
 - **Anthropic API key** ([Get yours here](https://console.anthropic.com/))
-- **Google Cloud project** with Cloud Run enabled
+- **Cloud CLI Tools** (for your target clouds):
+  - **Google Cloud SDK** ([Installation Guide](https://cloud.google.com/sdk/docs/install)) for GCP deployments
+  - **AWS CLI** ([Installation Guide](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html)) for AWS deployments
 
 ### Installation
 
@@ -121,47 +124,52 @@ Choose your preferred method:
    echo "GOOGLE_APPLICATION_CREDENTIALS=/path/to/your/service-account-key.json" >> .env
    ```
 
-### Your First Deployment
+### Your First Multi-Cloud Deployment
 
-#### 🐳 Using Docker
+#### 🚀 New Terraform Multi-Cloud Prototype
 
-1. **Validate your setup**
-
+1. **Deploy to GCP (default)**
    ```bash
-   docker-compose run --rm cloud-function-saas examples/example-spec.md --validate-only
+   python terraform_prototype.py examples/simple-terraform-example.spec.md
    ```
 
-2. **Deploy the example service**
-
+2. **Deploy to AWS**
    ```bash
-   docker-compose run --rm cloud-function-saas examples/example-spec.md --verbose
+   python terraform_prototype.py examples/simple-terraform-example.spec.md --provider aws
    ```
 
-3. **Test your deployed service**
+3. **Deploy to both GCP and AWS**
    ```bash
-   curl https://your-service-url.run.app/users
+   python terraform_prototype.py examples/simple-terraform-example.spec.md --provider both
    ```
 
-#### 🐍 Using Local Python
-
-1. **Validate your setup**
-
+4. **Test your deployed service**
    ```bash
-   python prototype.py examples/example-spec.md --validate-only
+   # Get service URL from Terraform output
+   curl https://your-service-url/health
    ```
 
-2. **Deploy the example service**
+#### 📚 More Examples
 
-   ```bash
-   python prototype.py examples/example-spec.md --verbose
-   ```
+- **Complex Multi-Cloud Service**: `python terraform_prototype.py examples/multi-cloud-example.spec.md --provider both`
+- **Plan Only**: `python terraform_prototype.py examples/simple-terraform-example.spec.md --terraform-plan-only`
+- **Custom Workspace**: `python terraform_prototype.py examples/simple-terraform-example.spec.md --terraform-workspace production`
 
-3. **Test your deployed service**
-   ```bash
-   curl https://your-service-url.run.app/users
-   ```
+#### 🔄 Legacy Cloud Run Deployment (Still Available)
 
-🎉 **That's it!** Your microservice is now live on Google Cloud Run.
+You can still use the original Cloud Run-only deployment:
+
+```bash
+# Original prototype (GCP only)
+python prototype.py examples/example-spec.md --verbose
+
+# Or legacy mode in new prototype
+python terraform_prototype.py examples/example-spec.md --legacy
+```
+
+🎉 **That's it!** Your microservice is now live on your chosen cloud platform(s) with complete infrastructure as code!
+
+📖 **For comprehensive multi-cloud deployment documentation, see [TERRAFORM_GUIDE.md](TERRAFORM_GUIDE.md)**
 
 ## 🐳 Docker Usage
 
