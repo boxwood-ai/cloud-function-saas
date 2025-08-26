@@ -10,7 +10,7 @@ from typing import Dict, Optional, List
 import anthropic
 
 from spec_parser import ServiceSpec
-from code_generator import CodeGenerator
+from legacy.code_generator import CodeGenerator
 
 
 class TerraformCodeGenerator(CodeGenerator):

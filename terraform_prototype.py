@@ -312,7 +312,7 @@ Examples:
     # Step 4: Generate code and Terraform configuration
     if args.legacy:
         # Use legacy code generation
-        from code_generator import CodeGenerator
+        from legacy.code_generator import CodeGenerator
         ui.update_task('generate_code', TaskStatus.IN_PROGRESS)
         print("\n🤖 Generating Cloud Run function code with Claude...")
         
@@ -478,7 +478,7 @@ Examples:
     # Step 7: Deploy or Plan
     if args.legacy:
         # Use existing legacy deployment logic
-        from cloud_run_deployer import CloudRunDeployer
+        from legacy.cloud_run_deployer import CloudRunDeployer
         ui.update_task('deploy', TaskStatus.IN_PROGRESS)
         # ... existing legacy deployment logic ...
         ui.update_task('deploy', TaskStatus.COMPLETED)

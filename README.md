@@ -9,7 +9,7 @@
 
 _Transform specification documents into deployed Google Cloud Run microservices with AI_
 
-[Quick Start](#quick-start) • [Examples](examples/) • [Documentation](future/goals.md) • [Contributing](future/CONTRIBUTING.md)
+[Quick Start](#quick-start) • [Examples](examples/) • [Documentation](unused/future/goals.md) • [Contributing](unused/future/CONTRIBUTING.md)
 
 </div>
 
@@ -161,10 +161,10 @@ You can still use the original Cloud Run-only deployment:
 
 ```bash
 # Original prototype (GCP only)
-python prototype.py examples/example-spec.md --verbose
+python legacy/prototype.py legacy/examples/example-spec.md --verbose
 
 # Or legacy mode in new prototype
-python terraform_prototype.py examples/example-spec.md --legacy
+python terraform_prototype.py legacy/examples/example-spec.md --legacy
 ```
 
 🎉 **That's it!** Your microservice is now live on your chosen cloud platform(s) with complete infrastructure as code!
@@ -258,12 +258,12 @@ Runtime: Node.js 20
 
 | Service Type        | Example                                                                              | Description               |
 | ------------------- | ------------------------------------------------------------------------------------ | ------------------------- |
-| **User Management** | [`examples/user-api-nodejs.spec.md`](examples/user-api-nodejs.spec.md)               | CRUD operations for users |
-| **Authentication**  | [`examples/auth-service-go.spec.md`](examples/auth-service-go.spec.md)               | JWT-based auth service    |
-| **Data Processing** | [`examples/data-processor-python.spec.md`](examples/data-processor-python.spec.md)   | Async data pipeline       |
-| **Webhooks**        | [`examples/webhook-handler-nodejs.spec.md`](examples/webhook-handler-nodejs.spec.md) | Event processing          |
+| **User Management** | [`legacy/examples/user-api-nodejs.spec.md`](legacy/examples/user-api-nodejs.spec.md)               | CRUD operations for users |
+| **Authentication**  | [`legacy/examples/auth-service-go.spec.md`](legacy/examples/auth-service-go.spec.md)               | JWT-based auth service    |
+| **Data Processing** | [`legacy/examples/data-processor-python.spec.md`](legacy/examples/data-processor-python.spec.md)   | Async data pipeline       |
+| **Webhooks**        | [`legacy/examples/webhook-handler-nodejs.spec.md`](legacy/examples/webhook-handler-nodejs.spec.md) | Event processing          |
 
-> 💡 **Tip**: Start with the [basic example](examples/example-spec.md) and modify it for your needs.
+> 💡 **Tip**: Start with the [basic example](legacy/examples/example-spec.md) and modify it for your needs.
 
 ## 🔐 Authentication & Docker Support
 
@@ -479,7 +479,7 @@ If you're still having issues:
 
 ## 🤝 Contributing
 
-We welcome contributions! Please see our [Contributing Guide](future/CONTRIBUTING.md) for details.
+We welcome contributions! Please see our [Contributing Guide](unused/future/CONTRIBUTING.md) for details.
 
 ### Development Setup
 
@@ -496,7 +496,7 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 
 ## 🌟 Support
 
-- 📖 **Documentation**: [Project Goals & Roadmap](future/goals.md)
+- 📖 **Documentation**: [Project Goals & Roadmap](unused/future/goals.md)
 - 🐛 **Issues**: [GitHub Issues](https://github.com/boxwood-ai/cloud-function-saas/issues)
 - 💬 **Discussions**: [GitHub Discussions](https://github.com/boxwood-ai/cloud-function-saas/discussions)
 
