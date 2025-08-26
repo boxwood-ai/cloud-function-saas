@@ -221,14 +221,16 @@ resource "google_monitoring_alert_policy" "error_rate" {
     display_name = "Error rate too high"
 
     condition_threshold {
-      filter          = "resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"${var.service_name}\" AND severity>=ERROR"
+      filter          = "resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"${var.service_name}\" AND metric.type=\"run.googleapis.com/request_count\""
       duration        = "300s"
-      comparison      = "GREATER_THAN"
+      comparison      = "COMPARISON_GT"
       threshold_value = var.error_rate_threshold
 
       aggregations {
         alignment_period   = "300s"
         per_series_aligner = "ALIGN_RATE"
+        cross_series_reducer = "REDUCE_SUM"
+        group_by_fields = ["resource.labels.service_name"]
       }
     }
   }

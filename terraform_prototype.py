@@ -126,6 +126,14 @@ Examples:
     parser.add_argument('--terraform-var-file',
                        help='Terraform variables file to use')
     
+    # Container Options
+    parser.add_argument('--container-image',
+                       help='Override container image URL (skips build step)')
+    parser.add_argument('--skip-container-build', action='store_true',
+                       help='Skip container build and use existing image')
+    parser.add_argument('--force-rebuild', action='store_true',
+                       help='Force rebuild of container (no cache)')
+    
     # Legacy Options
     parser.add_argument('--legacy', action='store_true',
                        help='Use legacy CloudRun deployment instead of Terraform')
@@ -537,13 +545,89 @@ Examples:
                     ui.print_status()
                     return
                 
+                # Build and push container (unless overridden)
+                container_image = None
+                if args.container_image:
+                    # Use provided container image
+                    container_image = args.container_image
+                    print(f"🐳 Using provided container image: {container_image}")
+                    logger.info(f"Using manual container image override: {container_image}")
+                elif not args.skip_container_build:
+                    # Build and push container
+                    from container_builder import ContainerBuilder
+                    
+                    print("🐳 Building and pushing container...")
+                    builder = ContainerBuilder(output_dir, logger)
+                    
+                    project_id = os.getenv('GOOGLE_CLOUD_PROJECT')
+                    region = os.getenv('GOOGLE_CLOUD_REGION', 'us-central1')
+                    
+                    if not project_id:
+                        print("❌ GOOGLE_CLOUD_PROJECT not set in environment")
+                        sys.exit(1)
+                    
+                    # Generate timestamp tag for unique builds
+                    tag = builder.get_build_timestamp_tag()
+                    
+                    build_success, build_result = builder.build_and_push(
+                        service_name=service_name,
+                        project_id=project_id,
+                        region=region,
+                        tag=tag,
+                        force_rebuild=args.force_rebuild
+                    )
+                    
+                    if build_success:
+                        container_image = build_result
+                        print(f"✅ Container built and pushed: {container_image}")
+                        logger.info(f"Container build successful: {container_image}")
+                    else:
+                        print(f"❌ Container build failed: {build_result}")
+                        print("💡 You can skip container build with --skip-container-build")
+                        print("💡 Or provide existing image with --container-image")
+                        logger.error(f"Container build failed: {build_result}")
+                        sys.exit(1)
+                
+                # Update terraform variables with actual container image
+                if container_image:
+                    # Update the tfvars file with the built container image
+                    tfvars_path = os.path.join(output_dir, 'terraform-gcp.tfvars')
+                    if os.path.exists(tfvars_path):
+                        with open(tfvars_path, 'r') as f:
+                            tfvars_content = f.read()
+                        
+                        # Replace container_image line
+                        import re
+                        updated_content = re.sub(
+                            r'container_image = "[^"]*"',
+                            f'container_image = "{container_image}"',
+                            tfvars_content
+                        )
+                        
+                        with open(tfvars_path, 'w') as f:
+                            f.write(updated_content)
+                        
+                        logger.info(f"Updated {tfvars_path} with container image: {container_image}")
+                
                 # Deploy with Terraform
+                # Use generated tfvars file if no custom one specified
+                tfvars_file = args.terraform_var_file
+                if not tfvars_file:
+                    # Default to the generated provider-specific tfvars file
+                    for provider in providers:
+                        generated_tfvars_path = os.path.join(output_dir, f'terraform-{provider}.tfvars')
+                        if os.path.exists(generated_tfvars_path):
+                            # Use just the filename since terraform runs from the output directory
+                            tfvars_file = f'terraform-{provider}.tfvars'
+                            logger.info(f"Using generated tfvars file: {tfvars_file} (full path: {generated_tfvars_path})")
+                            break
+                
                 if args.debug:
                     print("🔍 Debug mode: Running Terraform deployment with detailed output...")
                     success, outputs = deployer.deploy(
                         service_name, 
                         providers, 
-                        var_file=args.terraform_var_file,
+                        var_file=tfvars_file,
                         auto_approve=False  # Require manual approval in debug mode
                     )
                 else:
@@ -551,7 +635,7 @@ Examples:
                         success, outputs = deployer.deploy(
                             service_name, 
                             providers, 
-                            var_file=args.terraform_var_file,
+                            var_file=tfvars_file,
                             auto_approve=True
                         )
                 

@@ -330,15 +330,19 @@ Generate complete, production-ready files that can be immediately deployed.
         
         service_name = (spec.name or 'cloud-microservice').lower().replace(' ', '-').replace('_', '-')
         
+        # Get project ID from environment
+        project_id = os.getenv('GOOGLE_CLOUD_PROJECT', 'your-gcp-project-id')
+        region = os.getenv('GOOGLE_CLOUD_REGION', 'us-central1')
+        
         if provider == 'gcp':
             return f'''# Google Cloud Platform Configuration
-project_id = "your-gcp-project-id"
-region = "us-central1"
+project_id = "{project_id}"
+region = "{region}"
 service_name = "{service_name}"
 environment = "dev"
 
 # Container Configuration
-container_image = "gcr.io/your-gcp-project-id/{service_name}:latest"
+container_image = "gcr.io/{project_id}/{service_name}:latest"
 container_port = 8080
 
 # Scaling Configuration

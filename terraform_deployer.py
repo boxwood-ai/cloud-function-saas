@@ -355,6 +355,7 @@ class TerraformDeployer:
                     env=env,
                     capture_output=True,
                     text=True,
+                    stdin=subprocess.DEVNULL,  # Prevent hanging on interactive input
                     timeout=1800  # 30 minutes timeout
                 )
             else:
@@ -363,6 +364,7 @@ class TerraformDeployer:
                     cmd,
                     cwd=cwd,
                     env=env,
+                    stdin=subprocess.DEVNULL,  # Prevent hanging on interactive input
                     timeout=1800  # 30 minutes timeout
                 )
                 # Create a mock result for consistency
