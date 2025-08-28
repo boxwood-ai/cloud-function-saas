@@ -25,6 +25,7 @@ from dotenv import load_dotenv
 from ui import FancyUI, TaskStatus
 from spec_parser import SpecParser
 from code_generator import CodeGenerator
+from multi_agent_generator import MultiAgentCodeGenerator
 from cloud_run_deployer import CloudRunDeployer
 from utils import setup_logging, validate_configuration
 
@@ -38,10 +39,13 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python prototype.py spec.md                    # Use .env configuration
+  python prototype.py spec.md                    # Use multi-agent generation (default)
+  python prototype.py spec.md --single-agent     # Use classic single-agent mode
+  python prototype.py spec.md --multi-agent      # Force multi-agent mode
   python prototype.py spec.md --project my-gcp   # Override GCP project
   python prototype.py spec.md --validate-only    # Only validate configuration
   python prototype.py spec.md --debug            # Enable debug output
+  python prototype.py spec.md --debug --verbose  # Maximum debugging info
         """
     )
     parser.add_argument('spec_file', help='Path to spec.md file')
@@ -52,6 +56,8 @@ Examples:
     parser.add_argument('--dry-run', action='store_true', help='Generate files but don\'t deploy (show what would be deployed)')
     parser.add_argument('--verbose', '-v', action='store_true', help='Verbose output')
     parser.add_argument('--debug', '-d', action='store_true', help='Enable debug output to see what\'s happening')
+    parser.add_argument('--multi-agent', action='store_true', help='Use multi-agent code generation (experimental)')
+    parser.add_argument('--single-agent', action='store_true', help='Force single-agent code generation (classic mode)')
     
     args = parser.parse_args()
     
@@ -144,23 +150,63 @@ Examples:
     
     # Step 3: Generate code
     ui.update_task('generate_code', TaskStatus.IN_PROGRESS)
-    print("\n🤖 Generating Cloud Run function code with Claude...")
     
-    code_generator = CodeGenerator(debug=args.debug)
+    # Determine which code generation approach to use
+    use_multi_agent = False
+    if args.multi_agent:
+        use_multi_agent = True
+        print("\n🤖 Generating code with multi-agent system...")
+    elif args.single_agent:
+        use_multi_agent = False
+        print("\n🤖 Generating code with single-agent system...")
+    else:
+        # Default: use multi-agent for better quality
+        use_multi_agent = True
+        print("\n🤖 Generating code with multi-agent system (default)...")
+        if args.verbose:
+            print("   💡 Use --single-agent to use classic generation mode")
     
     try:
-        generated_files = code_generator.generate_cloud_function(spec)
+        if use_multi_agent:
+            # Use new multi-agent system
+            multi_agent_generator = MultiAgentCodeGenerator(debug=args.debug)
+            generated_files = multi_agent_generator.generate_cloud_function(spec)
+        else:
+            # Use classic single-agent system
+            code_generator = CodeGenerator(debug=args.debug)
+            generated_files = code_generator.generate_cloud_function(spec)
+        
         if not generated_files:
             ui.update_task('generate_code', TaskStatus.FAILED)
             print("❌ Error: Failed to generate code")
             sys.exit(1)
         
         ui.update_task('generate_code', TaskStatus.COMPLETED)
-        print(f"✅ Generated {len(generated_files)} files successfully")
+        generation_mode = "multi-agent" if use_multi_agent else "single-agent"
+        print(f"✅ Generated {len(generated_files)} files successfully ({generation_mode})")
+        
+        if args.verbose and generated_files:
+            print("   📄 Generated files:")
+            for filename in generated_files.keys():
+                print(f"     • {filename}")
+                
     except Exception as e:
         ui.update_task('generate_code', TaskStatus.FAILED)
-        print(f"❌ Error generating code: {e}")
-        sys.exit(1)
+        generation_mode = "multi-agent" if use_multi_agent else "single-agent"
+        print(f"❌ Error generating code ({generation_mode}): {e}")
+        
+        # If multi-agent fails, try single-agent as fallback
+        if use_multi_agent and not args.multi_agent:  # Only fallback if auto-selected multi-agent
+            print("🔄 Falling back to single-agent generation...")
+            try:
+                code_generator = CodeGenerator(debug=args.debug)
+                generated_files = code_generator.generate_cloud_function(spec)
+                print(f"✅ Generated {len(generated_files)} files successfully (single-agent fallback)")
+            except Exception as fallback_error:
+                print(f"❌ Fallback also failed: {fallback_error}")
+                sys.exit(1)
+        else:
+            sys.exit(1)
     
     # Step 4: Create output directory and setup logging
     if args.output_dir:
