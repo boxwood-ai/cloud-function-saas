@@ -168,9 +168,42 @@ Examples:
     
     try:
         if use_multi_agent:
-            # Use new multi-agent system
+            # Use new multi-agent system with timeout and fallback
             multi_agent_generator = MultiAgentCodeGenerator(debug=args.debug)
-            generated_files = multi_agent_generator.generate_cloud_function(spec)
+            
+            try:
+                import signal
+                
+                def timeout_handler(signum, frame):
+                    raise TimeoutError("Multi-agent generation timeout")
+                
+                # Set 5-minute timeout for multi-agent generation
+                old_handler = signal.signal(signal.SIGALRM, timeout_handler)
+                signal.alarm(300)  # 5 minutes
+                
+                generated_files = multi_agent_generator.generate_cloud_function(spec)
+                
+                # Cancel timeout if successful
+                signal.alarm(0)
+                signal.signal(signal.SIGALRM, old_handler)
+                
+            except (Exception, TimeoutError) as e:
+                # Cancel timeout
+                try:
+                    signal.alarm(0)
+                    signal.signal(signal.SIGALRM, old_handler if 'old_handler' in locals() else signal.SIG_DFL)
+                except:
+                    pass
+                    
+                if args.debug:
+                    logger.error(f"Multi-agent generation failed: {str(e)}")
+                
+                print(f"⚠️ Multi-agent generation failed, falling back to single-agent mode...")
+                print(f"   (Error: {str(e)[:100]}...)")
+                
+                # Fallback to single agent
+                code_generator = CodeGenerator(debug=args.debug)
+                generated_files = code_generator.generate_cloud_function(spec)
         else:
             # Use classic single-agent system
             code_generator = CodeGenerator(debug=args.debug)

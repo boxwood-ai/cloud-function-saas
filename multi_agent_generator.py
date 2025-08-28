@@ -57,25 +57,77 @@ class BaseAgent:
             print(f"🤖 [{self.role.value.upper()}] {message}")
     
     async def _call_claude(self, prompt: str, max_tokens: int = 4000) -> str:
-        """Make Claude API call with error handling"""
+        """Make Claude API call with error handling and timeout"""
         try:
             self._log_debug(f"Making Claude API call (tokens: {max_tokens})")
             
-            response = await asyncio.to_thread(
-                self.client.messages.create,
-                model=self.model,
-                max_tokens=max_tokens,
-                temperature=0.1,
-                messages=[{"role": "user", "content": prompt}]
+            # Add timeout to the API call (2 minutes for large responses)
+            response = await asyncio.wait_for(
+                asyncio.to_thread(
+                    self.client.messages.create,
+                    model=self.model,
+                    max_tokens=max_tokens,
+                    temperature=0.1,
+                    messages=[{"role": "user", "content": prompt}]
+                ),
+                timeout=120.0  # 2 minute timeout
             )
             
             result = response.content[0].text
             self._log_debug(f"Received response ({len(result)} chars)")
             return result
             
+        except asyncio.TimeoutError:
+            self._log_debug("Claude API call timed out after 120 seconds")
+            raise TimeoutError("Claude API call timeout")
         except Exception as e:
             self._log_debug(f"API call failed: {str(e)}")
             raise
+    
+    def _format_spec_for_prompt(self, spec: ServiceSpec) -> str:
+        """Format ServiceSpec object into markdown text for prompts"""
+        spec_text = f"# Service Name: {spec.name}\n"
+        spec_text += f"Description: {spec.description}\n"
+        spec_text += f"Runtime: {spec.runtime}\n\n"
+        
+        # Add endpoints section
+        if spec.endpoints:
+            spec_text += "## Endpoints\n\n"
+            for endpoint in spec.endpoints:
+                spec_text += f"### {endpoint.get('method', 'GET')} {endpoint.get('path', '/')}\n"
+                if endpoint.get('description'):
+                    spec_text += f"- Description: {endpoint['description']}\n"
+                if endpoint.get('input'):
+                    spec_text += f"- Input: {endpoint['input']}\n"
+                if endpoint.get('output'):
+                    spec_text += f"- Output: {endpoint['output']}\n"
+                if endpoint.get('auth') and endpoint['auth'] != 'None':
+                    spec_text += f"- Auth: {endpoint['auth']}\n"
+                spec_text += "\n"
+        
+        # Add models section
+        if spec.models:
+            spec_text += "## Models\n\n"
+            for model in spec.models:
+                spec_text += f"### {model.get('name', 'Model')}\n"
+                for field in model.get('fields', []):
+                    spec_text += f"- {field}\n"
+                spec_text += "\n"
+        
+        # Add optional sections
+        if spec.business_logic:
+            spec_text += "## Business Logic\n\n"
+            spec_text += f"{spec.business_logic}\n\n"
+        
+        if spec.database:
+            spec_text += "## Database\n\n"
+            spec_text += f"{spec.database}\n\n"
+            
+        if spec.deployment:
+            spec_text += "## Deployment\n\n"
+            spec_text += f"{spec.deployment}\n\n"
+        
+        return spec_text.strip()
 
 
 class CodeGeneratorAgent(BaseAgent):
@@ -90,7 +142,7 @@ class CodeGeneratorAgent(BaseAgent):
         self._log_debug("Generating primary code version")
         
         prompt = self._build_primary_prompt(spec)
-        response = await self._call_claude(prompt, max_tokens=4000)
+        response = await self._call_claude(prompt, max_tokens=12000)
         
         return self._parse_code_response(response)
     
@@ -99,7 +151,7 @@ class CodeGeneratorAgent(BaseAgent):
         self._log_debug(f"Generating alternative code version (style: {style})")
         
         prompt = self._build_alternative_prompt(spec, style)
-        response = await self._call_claude(prompt, max_tokens=4000)
+        response = await self._call_claude(prompt, max_tokens=12000)
         
         return self._parse_code_response(response)
     
@@ -109,16 +161,17 @@ class CodeGeneratorAgent(BaseAgent):
         self._log_debug("Refining code based on validation feedback")
         
         prompt = self._build_refinement_prompt(spec, current_code, validation_issues)
-        response = await self._call_claude(prompt, max_tokens=4000)
+        response = await self._call_claude(prompt, max_tokens=12000)
         
         return self._parse_code_response(response)
     
     def _build_primary_prompt(self, spec: ServiceSpec) -> str:
         """Build prompt for primary code generation"""
+        spec_text = self._format_spec_for_prompt(spec)
         return f"""Generate production-ready {spec.runtime} code for this API specification.
 
 SPECIFICATION:
-{spec.raw_content}
+{spec_text}
 
 REQUIREMENTS:
 - Focus on clean, readable, maintainable code
@@ -150,10 +203,11 @@ Generate complete, working, production-ready code that fully implements the spec
             "minimal": "Focus on minimal dependencies and lightweight implementation"
         }
         
+        spec_content = self._format_spec_for_prompt(spec)
         return f"""Generate an alternative {spec.runtime} implementation for this API specification.
 
 SPECIFICATION:
-{spec.raw_content}
+{spec_content}
 
 ALTERNATIVE APPROACH:
 {style_instructions.get(style, style)}
@@ -185,10 +239,11 @@ Generate complete, working, production-ready code that fully implements the spec
         code_summary = "\n".join([f"**{filename}**:\n{content[:500]}..." 
                                  for filename, content in current_code.items()])
         
+        spec_content = self._format_spec_for_prompt(spec)
         return f"""Refine this {spec.runtime} code to address the validation issues found.
 
 ORIGINAL SPECIFICATION:
-{spec.raw_content}
+{spec_content}
 
 CURRENT CODE:
 {code_summary}
@@ -219,7 +274,16 @@ Generate the complete refined code that addresses all validation issues."""
 
     def _parse_code_response(self, response: str) -> Dict[str, str]:
         """Parse Claude's response to extract code files"""
+        import signal
+        
+        def timeout_handler(signum, frame):
+            raise TimeoutError("JSON parsing timeout")
+        
         try:
+            # Set a 30-second timeout for JSON parsing
+            old_handler = signal.signal(signal.SIGALRM, timeout_handler)
+            signal.alarm(30)
+            
             # Look for JSON block in response
             start_marker = "```json"
             end_marker = "```"
@@ -232,18 +296,138 @@ Generate the complete refined code that addresses all validation issues."""
             end_idx = response.find(end_marker, start_idx)
             
             if end_idx == -1:
-                raise ValueError("Malformed JSON code block in response")
+                # Try to find the end of JSON even if closing ``` is missing
+                json_content = response[start_idx:].strip()
+                # Try to fix incomplete JSON by adding closing brace if needed
+                if json_content and not json_content.endswith('}'):
+                    json_content = json_content.rstrip(',') + '}'
+            else:
+                json_content = response[start_idx:end_idx].strip()
             
-            json_content = response[start_idx:end_idx].strip()
+            # Try to parse the JSON
             code_files = json.loads(json_content)
+            
+            # Cancel the alarm
+            signal.alarm(0)
+            signal.signal(signal.SIGALRM, old_handler)
+            
+            # Validate that we got a dictionary with string keys and values
+            if not isinstance(code_files, dict):
+                raise ValueError("Response is not a JSON object")
+                
+            for key, value in code_files.items():
+                if not isinstance(key, str) or not isinstance(value, str):
+                    raise ValueError(f"Invalid file entry: {key}")
             
             self._log_debug(f"Parsed {len(code_files)} code files")
             return code_files
             
+        except (json.JSONDecodeError, TimeoutError) as e:
+            # Cancel alarm
+            try:
+                signal.alarm(0)
+                signal.signal(signal.SIGALRM, old_handler if 'old_handler' in locals() else signal.SIG_DFL)
+            except:
+                pass
+                
+            self._log_debug(f"JSON parsing failed: {str(e)}")
+            # Try to extract files using regex pattern matching as fallback
+            return self._extract_files_with_regex(response)
         except Exception as e:
+            # Cancel alarm
+            try:
+                signal.alarm(0)
+                signal.signal(signal.SIGALRM, old_handler if 'old_handler' in locals() else signal.SIG_DFL)
+            except:
+                pass
+                
             self._log_debug(f"Failed to parse code response: {str(e)}")
-            # Fallback: return response as single file
+            # Last resort fallback: return response as single file
             return {"generated_code.txt": response}
+    
+    def _extract_files_with_regex(self, response: str) -> Dict[str, str]:
+        """Fallback method to extract files using regex patterns with timeout"""
+        import re
+        import signal
+        
+        def timeout_handler(signum, frame):
+            raise TimeoutError("Regex processing timeout")
+        
+        files = {}
+        
+        try:
+            # Set a 10-second timeout for regex processing
+            old_handler = signal.signal(signal.SIGALRM, timeout_handler)
+            signal.alarm(10)
+            
+            # Simple and fast extraction - just find the filenames and approximate content
+            # This is much faster than complex regex with DOTALL
+            
+            # Look for common file patterns in the response
+            filenames = ["index.js", "package.json", "Dockerfile", "README.md", "main.js", "app.js"]
+            
+            for filename in filenames:
+                # Look for pattern: "filename": "content"
+                pattern = f'"{filename}"\\s*:\\s*"'
+                match = re.search(pattern, response)
+                if match:
+                    content_start = match.end()
+                    
+                    # Find the end by looking for the next quote that's not escaped
+                    # But limit search to avoid hanging on very long content
+                    search_limit = min(content_start + 20000, len(response))
+                    content_section = response[content_start:search_limit]
+                    
+                    # Simple approach: find first occurrence of ", that looks like end of field
+                    # This won't be perfect but will be fast and usually work
+                    end_patterns = ['",\\s*"', '"}', '"\\s*}']
+                    content_end = len(content_section)
+                    
+                    for end_pattern in end_patterns:
+                        match_end = re.search(end_pattern, content_section)
+                        if match_end:
+                            content_end = match_end.start()
+                            break
+                    
+                    if content_end > 0:
+                        content = content_section[:content_end]
+                        # Basic unescaping
+                        content = content.replace('\\"', '"').replace('\\n', '\n').replace('\\\\', '\\')
+                        files[filename] = content
+            
+            # Cancel the alarm
+            signal.alarm(0)
+            signal.signal(signal.SIGALRM, old_handler)
+            
+        except TimeoutError:
+            self._log_debug("Regex processing timed out, using simple fallback")
+            # Cancel alarm and restore handler
+            signal.alarm(0)
+            signal.signal(signal.SIGALRM, old_handler if 'old_handler' in locals() else signal.SIG_DFL)
+            
+            # Simple fallback - return truncated response
+            truncated_response = response[:5000] + "\n... (truncated due to timeout)" if len(response) > 5000 else response
+            return {"generated_code.txt": truncated_response}
+        
+        except Exception as e:
+            # Cancel alarm if it's still set
+            try:
+                signal.alarm(0)
+                signal.signal(signal.SIGALRM, old_handler if 'old_handler' in locals() else signal.SIG_DFL)
+            except:
+                pass
+            
+            self._log_debug(f"Regex extraction failed: {str(e)}")
+            truncated_response = response[:5000] + "\n... (truncated due to error)" if len(response) > 5000 else response
+            return {"generated_code.txt": truncated_response}
+        
+        if files:
+            self._log_debug(f"Extracted {len(files)} files using fast regex")
+            return files
+        else:
+            # No files extracted, return truncated response
+            truncated_response = response[:5000] + "\n... (no files found)" if len(response) > 5000 else response
+            return {"generated_code.txt": truncated_response}
 
 
 class ValidatorAgent(BaseAgent):
@@ -267,10 +451,11 @@ class ValidatorAgent(BaseAgent):
         code_summary = "\n".join([f"**{filename}**:\n{content}" 
                                  for filename, content in code_files.items()])
         
+        spec_content = self._format_spec_for_prompt(spec)
         return f"""Validate this generated code against the original specification.
 
 ORIGINAL SPECIFICATION:
-{spec.raw_content}
+{spec_content}
 
 GENERATED CODE:
 {code_summary}
@@ -372,10 +557,11 @@ class TestGeneratorAgent(BaseAgent):
         """Build test generation prompt"""
         main_file = code_files.get("index.js", code_files.get("main.py", ""))
         
+        spec_content = self._format_spec_for_prompt(spec)
         return f"""Generate comprehensive tests for this API service.
 
 SPECIFICATION:
-{spec.raw_content}
+{spec_content}
 
 MAIN APPLICATION CODE:
 {main_file[:1500]}...
