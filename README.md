@@ -55,7 +55,7 @@ gcloud auth login
 gcloud config set project your-gcp-project-id
 
 # Deploy your first service
-docker-compose run --rm cloud-function-saas examples/example-spec.md --verbose
+docker-compose run --rm cloud-function-saas specs/examples/01-hello-world.md --verbose
 ```
 
 #### 🐍 Option 2: Local Python (Recommended)
@@ -74,17 +74,17 @@ gcloud auth login
 gcloud config set project your-gcp-project-id
 
 # Deploy your first service
-python prototype.py examples/example-spec.md --verbose
+python prototype.py specs/examples/01-hello-world.md --verbose
 ```
 
 ### Your First Deployment
 
 ```bash
 # Validate setup
-python prototype.py examples/example-spec.md --validate-only
+python prototype.py specs/template.md --validate-only
 
 # Deploy with multi-agent generation (default)
-python prototype.py examples/example-spec.md --verbose
+python prototype.py specs/template.md --verbose
 
 # Test your deployed service
 curl https://your-service-url.run.app/users
@@ -92,42 +92,42 @@ curl https://your-service-url.run.app/users
 
 ## 📋 Writing Specifications
 
-Simple, intuitive markdown format:
+Simple specs in just 20-50 lines of markdown:
 
 ```markdown
-# Service Name: Your API Name
-
-Description: What your service does
+# Service Name: My API Service
+Description: What your service does in one line
 Runtime: Node.js 20
 
 ## Endpoints
 
-### GET /users
+### GET /items
+- Description: List all items
+- Output: { items: array }
 
-- Description: Get all users
-- Output: { users: array }
-
-### POST /users
-
-- Description: Create new user
-- Input: { name: string, email: string }
-- Output: { user: object }
+### POST /items
+- Description: Create new item
+- Input: { name: string, value: number }
+- Output: { item: Item, id: string }
 
 ## Models
 
-### User
-
+### Item
+- id: string (auto-generated)
 - name: string (required)
-- email: string (required)
+- value: number
 - createdAt: timestamp
 ```
 
+**📝 Start here:** [Template Spec](specs/template.md) - Copy and customize!
+
 **Example Specifications:**
 
-- [User Management API](examples/user-api-nodejs.spec.md)
-- [Authentication Service](examples/auth-service-go.spec.md)
-- [Data Processing Pipeline](examples/data-processor-python.spec.md)
-- [Webhook Handler](examples/webhook-handler-nodejs.spec.md)
+- [Hello World](specs/examples/01-hello-world.md) - Simplest API (12 lines)
+- [Todo List](specs/examples/02-todo-list.md) - CRUD operations (30 lines)
+- [Email Service](specs/examples/03-email-sender.md) - Send notifications (23 lines)
+- [Auth Service](specs/examples/06-auth-basic.md) - JWT authentication (28 lines)
+- [More examples...](specs/examples/)
 
 ## 🔐 Authentication
 
