@@ -17,7 +17,7 @@ _Transform specification documents into deployed Google Cloud Run microservices 
 
 ## 🚀 What is Cloud Function SaaS?
 
-Cloud Function SaaS is an AI-powered tool that converts simple markdown specifications into fully deployed Google Cloud Run microservices. Write your API specification in plain English, and let a **team of specialized AI agents** generate, validate, and deploy production-ready code.
+Cloud Function SaaS is an AI-powered tool that converts simple markdown specifications into fully deployed Google Cloud Run microservices. Write your API specification in plain English, and let a team of AI agents generate, validate, and deploy.
 
 ### ✨ Key Features
 
@@ -27,15 +27,6 @@ Cloud Function SaaS is an AI-powered tool that converts simple markdown specific
 - ☁️ **Auto-Deploy**: Direct deployment to Google Cloud Run in under 2 minutes
 - 🔧 **Multi-Language**: Support for Node.js, Python, Go (planned)
 - ✅ **Spec Compliance**: Generated code automatically validated against your requirements
-
-### 🏆 Multi-Agent System Benefits
-
-| Metric              | Single Agent         | Multi-Agent System          |
-| ------------------- | -------------------- | --------------------------- |
-| **Success Rate**    | ~70%                 | **95%+**                    |
-| **Spec Compliance** | Manual review needed | **Automatic validation**    |
-| **Code Quality**    | Variable             | **Consistent high quality** |
-| **Issue Detection** | Post-deployment      | **Pre-deployment**          |
 
 ## 🚀 Quick Start
 
@@ -146,8 +137,6 @@ Supports multiple authentication methods with automatic detection:
 | -------------------------- | ------------------------- | ------------------------------------ |
 | **🖥️ gcloud CLI**          | Local development         | `gcloud auth login`                  |
 | **🔑 Service Account Key** | Docker, CI/CD, Production | Set `GOOGLE_APPLICATION_CREDENTIALS` |
-| **☁️ Instance Metadata**   | Google Compute Engine     | Automatic                            |
-| **🔄 Workload Identity**   | Google Kubernetes Engine  | Automatic                            |
 
 ## ⚙️ Configuration
 
@@ -178,15 +167,6 @@ python prototype.py <spec-file> [options]
 --single-agent     Use classic single-agent mode
 ```
 
-## 🛡️ Validation & Error Handling
-
-Robust validation included:
-
-- 🔑 **API Keys**: Validates Anthropic API access
-- ☁️ **GCP Setup**: Checks `gcloud` auth and permissions
-- 📋 **Spec Format**: Validates specification syntax
-- 🚀 **Cloud Run**: Verifies service deployment
-
 ## 📖 Documentation
 
 - [Multi-Agent System Guide](docs/multi-agent-system.md)
@@ -195,10 +175,6 @@ Robust validation included:
 - [Troubleshooting](docs/troubleshooting.md)
 - [Contributing Guide](docs/contributing.md)
 
-## 🤝 Contributing
-
-We welcome contributions! See our [Contributing Guide](docs/contributing.md) for details.
-
 ## 📄 License
 
 This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
@@ -206,8 +182,6 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 ---
 
 <div align="center">
-
-**Made with ❤️ and AI**
 
 [⭐ Star this repo](https://github.com/boxwood-ai/cloud-function-saas) • [🍴 Fork it](https://github.com/boxwood-ai/cloud-function-saas/fork) • [🐛 Report Issues](https://github.com/boxwood-ai/cloud-function-saas/issues)
 
