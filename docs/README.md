@@ -120,7 +120,45 @@ Cloud Function SaaS automatically configures basic monitoring for deployed servi
 - **Error Reporting**: Automatic error aggregation
 - **Health Checks**: Built-in health endpoints
 
-## 🔄 Deployment Lifecycle
+## 🔄 How It Works
+
+### Multi-Agent Architecture Flow
+
+```mermaid
+flowchart TD
+    A[📄 API Spec] --> B{Multi-Agent System}
+    
+    B --> C[🔧 Code Generator Agent]
+    B --> D[🔧 Code Generator Agent]
+    
+    C --> E[📝 Primary Version<br/>Focus: Readability]
+    D --> F[📝 Alternative Version<br/>Focus: Performance]
+    
+    E --> G[✅ Validator Agent]
+    F --> H[✅ Validator Agent]
+    
+    G --> I[📊 Score: 0.85<br/>✅ Spec Compliant]
+    H --> J[📊 Score: 0.92<br/>✅ Spec Compliant]
+    
+    I --> K{Quality Gate<br/>Threshold: 0.8}
+    J --> K
+    
+    K -->|✅ Pass| L[🚀 Deploy Best Version<br/>Score: 0.92]
+    K -->|❌ Fail| M[🔄 Refinement Loop<br/>Up to 3 iterations]
+    
+    M --> N[🔧 Refine Code]
+    N --> O[✅ Re-validate]
+    O --> K
+    
+    L --> P[📦 Production Service<br/>⚡ < 2 minutes total]
+    
+    style B fill:#e1f5fe
+    style K fill:#fff3e0
+    style L fill:#e8f5e8
+    style P fill:#f3e5f5
+```
+
+### Deployment Lifecycle
 
 1. **Specification** - Write your API specification in markdown
 2. **Validation** - System validates spec format and requirements
