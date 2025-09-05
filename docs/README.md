@@ -126,37 +126,58 @@ Cloud Function SaaS automatically configures basic monitoring for deployed servi
 
 ```mermaid
 flowchart TD
-    A[📄 API Spec] --> B{Multi-Agent System}
-    
-    B --> C[🔧 Code Generator Agent]
-    B --> D[🔧 Code Generator Agent]
-    
-    C --> E[📝 Primary Version<br/>Focus: Readability]
-    D --> F[📝 Alternative Version<br/>Focus: Performance]
-    
-    E --> G[✅ Validator Agent]
-    F --> H[✅ Validator Agent]
-    
-    G --> I[📊 Score: 0.85<br/>✅ Spec Compliant]
-    H --> J[📊 Score: 0.92<br/>✅ Spec Compliant]
-    
-    I --> K{Quality Gate<br/>Threshold: 0.8}
+    A[📄 API Spec<br/><b>spec_parser.py</b><br/>Parses markdown specs<br/>into ServiceSpec objects] --> B{Multi-Agent System<br/><b>multi_agent_generator.py</b><br/>Orchestrates parallel generation}
+
+    B --> C[🔧 Code Generator Agent<br/><b>CodeGeneratorAgent class</b><br/>Creates primary implementation]
+    B --> D[🔧 Code Generator Agent<br/><b>CodeGeneratorAgent class</b><br/>Creates alternative approach]
+
+    C --> E[📝 Primary Version<br/>Focus: Readability<br/><b>GenerationAttempt</b><br/>Contains code files + metadata]
+    D --> F[📝 Alternative Version<br/>Focus: Performance<br/><b>GenerationAttempt</b><br/>Contains code files + metadata]
+
+    E --> G[✅ Validator Agent<br/><b>ValidatorAgent class</b><br/>Scores spec compliance<br/>& code quality]
+    F --> H[✅ Validator Agent<br/><b>ValidatorAgent class</b><br/>Scores spec compliance<br/>& code quality]
+
+    G --> I[📊 Score: 0.85<br/>✅ Spec Compliant<br/><b>ValidationResult</b><br/>Contains score + issues]
+    H --> J[📊 Score: 0.92<br/>✅ Spec Compliant<br/><b>ValidationResult</b><br/>Contains score + issues]
+
+    I --> K{Quality Gate<br/>Threshold: 0.8<br/><b>MULTI_AGENT_QUALITY_THRESHOLD</b><br/>Environment variable}
     J --> K
-    
-    K -->|✅ Pass| L[🚀 Deploy Best Version<br/>Score: 0.92]
-    K -->|❌ Fail| M[🔄 Refinement Loop<br/>Up to 3 iterations]
-    
-    M --> N[🔧 Refine Code]
-    N --> O[✅ Re-validate]
+
+    K -->|✅ Pass| L[🚀 Deploy Best Version<br/>Score: 0.92<br/><b>cloud_run_deployer.py</b><br/>Uses Google Cloud Build]
+    K -->|❌ Fail| M[🔄 Refinement Loop<br/>Up to 3 iterations<br/><b>MULTI_AGENT_MAX_ITERATIONS</b><br/>Environment variable]
+
+    M --> N[🔧 Refine Code<br/><b>_refine_attempt()</b><br/>Method in MultiAgentCodeGenerator]
+    N --> O[✅ Re-validate<br/><b>ValidatorAgent.validate()</b><br/>Re-scores refined code]
     O --> K
-    
-    L --> P[📦 Production Service<br/>⚡ < 2 minutes total]
-    
+
+    L --> P[📦 Production Service<br/>⚡ < 2 minutes total<br/><b>Google Cloud Run</b><br/>Deployed microservice]
+
     style B fill:#e1f5fe
     style K fill:#fff3e0
     style L fill:#e8f5e8
     style P fill:#f3e5f5
 ```
+
+### File Structure & Flow Mapping
+
+**Entry Point:**
+
+- `prototype.py` - Main orchestrator that coordinates the entire workflow, parses command line arguments, and calls the appropriate components
+
+**Core Components:**
+
+- `spec_parser.py` - Contains `SpecParser` class that converts markdown specifications into structured `ServiceSpec` objects
+- `multi_agent_generator.py` - Heart of the multi-agent system containing:
+  - `MultiAgentCodeGenerator` - Main coordinator
+  - `CodeGeneratorAgent` - Creates code implementations
+  - `ValidatorAgent` - Scores and validates generated code
+  - `GenerationAttempt` & `ValidationResult` - Data structures for tracking results
+- `cloud_run_deployer.py` - Handles Google Cloud Build and Cloud Run deployment via `CloudRunDeployer` class
+
+**Configuration:**
+
+- Environment variables like `MULTI_AGENT_QUALITY_THRESHOLD` and `MULTI_AGENT_MAX_ITERATIONS` control the quality gates and retry behavior
+- `ui.py` provides terminal interface feedback throughout the process
 
 ### Deployment Lifecycle
 
