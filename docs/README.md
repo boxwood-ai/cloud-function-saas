@@ -126,31 +126,31 @@ Cloud Function SaaS automatically configures basic monitoring for deployed servi
 
 ```mermaid
 flowchart TD
-    A[📄 API Spec<br/><b>spec_parser.py</b><br/>Parses markdown specs<br/>into ServiceSpec objects] --> B{Multi-Agent System<br/><b>multi_agent_generator.py</b><br/>Orchestrates parallel generation}
+    A["📄 API Spec<br/>spec_parser.py<br/>Parses markdown specs<br/>into ServiceSpec objects"] --> B{"Multi-Agent System<br/>multi_agent_generator.py<br/>Orchestrates parallel generation"}
 
-    B --> C[🔧 Code Generator Agent<br/><b>CodeGeneratorAgent class</b><br/>Creates primary implementation]
-    B --> D[🔧 Code Generator Agent<br/><b>CodeGeneratorAgent class</b><br/>Creates alternative approach]
+    B --> C["🔧 Code Generator Agent<br/>CodeGeneratorAgent class<br/>Creates primary implementation"]
+    B --> D["🔧 Code Generator Agent<br/>CodeGeneratorAgent class<br/>Creates alternative approach"]
 
-    C --> E[📝 Primary Version<br/>Focus: Readability<br/><b>GenerationAttempt</b><br/>Contains code files + metadata]
-    D --> F[📝 Alternative Version<br/>Focus: Performance<br/><b>GenerationAttempt</b><br/>Contains code files + metadata]
+    C --> E["📝 Primary Version<br/>Focus: Readability<br/>GenerationAttempt<br/>Contains code files + metadata"]
+    D --> F["📝 Alternative Version<br/>Focus: Performance<br/>GenerationAttempt<br/>Contains code files + metadata"]
 
-    E --> G[✅ Validator Agent<br/><b>ValidatorAgent class</b><br/>Scores spec compliance<br/>& code quality]
-    F --> H[✅ Validator Agent<br/><b>ValidatorAgent class</b><br/>Scores spec compliance<br/>& code quality]
+    E --> G["✅ Validator Agent<br/>ValidatorAgent class<br/>Scores spec compliance<br/>& code quality"]
+    F --> H["✅ Validator Agent<br/>ValidatorAgent class<br/>Scores spec compliance<br/>& code quality"]
 
-    G --> I[📊 Score: 0.85<br/>✅ Spec Compliant<br/><b>ValidationResult</b><br/>Contains score + issues]
-    H --> J[📊 Score: 0.92<br/>✅ Spec Compliant<br/><b>ValidationResult</b><br/>Contains score + issues]
+    G --> I["📊 Score: 0.85<br/>✅ Spec Compliant<br/>ValidationResult<br/>Contains score + issues"]
+    H --> J["📊 Score: 0.92<br/>✅ Spec Compliant<br/>ValidationResult<br/>Contains score + issues"]
 
-    I --> K{Quality Gate<br/>Threshold: 0.8<br/><b>MULTI_AGENT_QUALITY_THRESHOLD</b><br/>Environment variable}
+    I --> K{"Quality Gate<br/>Threshold: 0.8<br/>MULTI_AGENT_QUALITY_THRESHOLD<br/>Environment variable"}
     J --> K
 
-    K -->|✅ Pass| L[🚀 Deploy Best Version<br/>Score: 0.92<br/><b>cloud_run_deployer.py</b><br/>Uses Google Cloud Build]
-    K -->|❌ Fail| M[🔄 Refinement Loop<br/>Up to 3 iterations<br/><b>MULTI_AGENT_MAX_ITERATIONS</b><br/>Environment variable]
+    K -->|"✅ Pass"| L["🚀 Deploy Best Version<br/>Score: 0.92<br/>cloud_run_deployer.py<br/>Uses Google Cloud Build"]
+    K -->|"❌ Fail"| M["🔄 Refinement Loop<br/>Up to 3 iterations<br/>MULTI_AGENT_MAX_ITERATIONS<br/>Environment variable"]
 
-    M --> N[🔧 Refine Code<br/><b>_refine_attempt()</b><br/>Method in MultiAgentCodeGenerator]
-    N --> O[✅ Re-validate<br/><b>ValidatorAgent.validate()</b><br/>Re-scores refined code]
+    M --> N["🔧 Refine Code<br/>_refine_attempt()<br/>Method in MultiAgentCodeGenerator"]
+    N --> O["✅ Re-validate<br/>ValidatorAgent.validate()<br/>Re-scores refined code"]
     O --> K
 
-    L --> P[📦 Production Service<br/>⚡ < 2 minutes total<br/><b>Google Cloud Run</b><br/>Deployed microservice]
+    L --> P["📦 Production Service<br/>⚡ < 2 minutes total<br/>Google Cloud Run<br/>Deployed microservice"]
 
     style B fill:#e1f5fe
     style K fill:#fff3e0
